@@ -239,8 +239,6 @@ public abstract class InheritedPropertiesBase
     public List<string> IgnoredObjectNames { get; }
     public List<string> IgnoredObjectRelativePaths { get; }
 
-    // Helper method for merging ignore lists
-    protected static List<string> MergeIgnoreLists(params IEnumerable<string>[] sources);
 }
 ```
 
@@ -270,18 +268,10 @@ public class ProjectInfo : InheritedPropertiesBase
     public string DirectoryPath { get; }
     public string FilePath { get; }
     public VersionManager VersionManager { get; }
-    public LinkedList<ProjectInfo> ReferencedProjects { get; }
+    public List<ProjectInfo> ReferencedProjects { get; }
 
     // Method to initialize inherited properties
     public void InitializeInheritedProperties(Settings globalSettings, SolutionConfig solutionConfig, ProjectConfig projectConfig);
-
-    // Methods
-    public List<string> Build();
-    public List<string> Restore();
-    public List<string> UpdateNuGetPackages();
-    public List<string> Cleanup();
-    public List<string> Rebuild();
-    public List<string> Archive();
 }
 ```
 
@@ -341,7 +331,7 @@ public class VersionManager
    - Add these to the project's VersionManager
    - Extract project references from project file
    - Resolve referenced projects
-   - Build dependency graph using linked list structure
+   - Build dependency graph using project references
 
 ### 5.3 Project Selection and Operations
 

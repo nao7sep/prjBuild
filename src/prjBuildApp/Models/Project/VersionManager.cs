@@ -5,11 +5,34 @@ namespace prjBuildApp.Models.Project
 {
     public enum VersionSourceType
     {
-        CsprojFile,    // Version from project file
-        AssemblyInfo,  // Version from AssemblyInfo.cs
-        AssemblyFileInfo, // Version from assembly file version attribute
-        Manifest,      // Version from app.manifest
-        Other          // Version from other sources
+        /// <summary>
+        /// Version from .csproj project file.
+        /// Typically appears in XML format like:
+        /// <Version>1.2.3.4</Version> or
+        /// <PackageVersion>1.2.3.4</PackageVersion> or
+        /// <AssemblyVersion>1.2.3.4</AssemblyVersion>
+        /// Usually found within a PropertyGroup element.
+        /// </summary>
+        CsprojFile,
+
+        /// <summary>
+        /// Version from AssemblyInfo.cs file.
+        /// Appears as C# attributes like:
+        /// [assembly: AssemblyVersion("1.2.3.4")] or
+        /// [assembly: AssemblyFileVersion("1.2.3.4")]
+        /// Usually found in Properties/AssemblyInfo.cs.
+        /// May include multiple version attributes (AssemblyVersion, AssemblyFileVersion, etc.)
+        /// </summary>
+        AssemblyInfo,
+
+        /// <summary>
+        /// Version from app.manifest file.
+        /// Appears in XML format like:
+        /// <assemblyIdentity version="1.2.3.4" name="MyApplication.app"/>
+        /// Usually found within the application manifest file.
+        /// Used for ClickOnce deployments and Windows application manifests.
+        /// </summary>
+        Manifest
     }
 
     public class VersionSource

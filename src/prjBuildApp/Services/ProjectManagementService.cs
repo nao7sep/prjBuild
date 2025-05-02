@@ -55,12 +55,12 @@ namespace prjBuildApp.Services
 
                         var solution = new SolutionInfo(solutionName, directory, solutionFile);
 
-                        // Set IsObsolete from configuration if available
+                        // Initialize inherited properties from configuration
                         var solutionConfig = _settings.Solutions.FirstOrDefault(s => s.Name == solutionName);
-                        if (solutionConfig != null)
-                        {
-                            solution.IsObsolete = solutionConfig.IsObsolete;
-                        }
+
+                        // Call InitializeInheritedProperties even if solutionConfig is null
+                        // This ensures the solution inherits properties from global settings
+                        solution.InitializeInheritedProperties(_settings, solutionConfig);
 
                         _solutions.Add(solution);
 
@@ -96,16 +96,13 @@ namespace prjBuildApp.Services
 
                 var project = new ProjectInfo(solution, projectName, projectDirectory, projectFile);
 
-                // Set IsObsolete from configuration if available
+                // Initialize inherited properties from configuration
                 var solutionConfig = _settings.Solutions.FirstOrDefault(s => s.Name == solution.Name);
-                if (solutionConfig != null)
-                {
-                    var projectConfig = solutionConfig.Projects.FirstOrDefault(p => p.Name == projectName);
-                    if (projectConfig != null)
-                    {
-                        project.IsObsolete = projectConfig.IsObsolete;
-                    }
-                }
+                var projectConfig = solutionConfig?.Projects.FirstOrDefault(p => p.Name == projectName);
+
+                // Call InitializeInheritedProperties even if projectConfig is null
+                // This ensures the project inherits properties from global settings and solution configuration
+                project.InitializeInheritedProperties(_settings, solutionConfig, projectConfig);
 
                 solution.Projects.Add(project);
 

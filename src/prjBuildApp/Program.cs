@@ -39,18 +39,32 @@ namespace prjBuildApp
             catch (Exception ex)
             {
                 // Fallback error handling in case logging service isn't initialized
+                // Format console output to match Serilog's console format
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"Fatal error: {ex.Message}");
-                Console.WriteLine(ex.StackTrace);
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss} FTL] {ex.Message}");
+                if (ex.StackTrace != null)
+                {
+                    Console.WriteLine(ex.StackTrace);
+                }
                 Console.ResetColor();
 
                 // Ensure logs directory exists
                 Directory.CreateDirectory("logs");
 
-                // Log the error to a file
+                // Log the error to a file with format matching Serilog's file output format exactly
+                string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+                string timeZone = DateTime.Now.ToString("zzz");
+                string logContent = $"{timestamp} {timeZone} [FTL] {ex.Message}{Environment.NewLine}";
+
+                // Only add stack trace if available (avoid redundant newline)
+                if (!string.IsNullOrEmpty(ex.StackTrace))
+                {
+                    logContent += $"{ex.StackTrace}{Environment.NewLine}";
+                }
+
                 File.AppendAllText(
                     Path.Combine("logs", $"prjBuild-error-{DateTime.Now:yyyyMMdd-HHmmss}.log"),
-                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} [FATAL] {ex.Message}{Environment.NewLine}{ex.StackTrace}{Environment.NewLine}"
+                    logContent
                 );
             }
             finally

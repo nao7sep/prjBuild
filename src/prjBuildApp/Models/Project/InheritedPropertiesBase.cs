@@ -24,18 +24,5 @@ namespace prjBuildApp.Models.Project
         /// </summary>
         public List<string> IgnoredObjectRelativePaths { get; } = new();
 
-        /// <summary>
-        /// Merges ignore lists from multiple sources
-        /// </summary>
-        /// <param name="sources">Collections of strings to merge</param>
-        /// <returns>A new list containing all unique items from the sources</returns>
-        protected static List<string> MergeIgnoreLists(params IEnumerable<string>?[] sources)
-        {
-            return sources
-                .Where(source => source != null)
-                .SelectMany(source => source!)
-                .Distinct()
-                .ToList();
-        }
     }
 }

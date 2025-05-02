@@ -10,7 +10,7 @@ namespace prjBuildApp.Models.Project
         public string DirectoryPath { get; }
         public string FilePath { get; }
         public VersionManager VersionManager { get; }
-        public LinkedList<ProjectInfo> ReferencedProjects { get; }
+        public List<ProjectInfo> ReferencedProjects { get; }
 
         public ProjectInfo(SolutionInfo solution, string name, string directoryPath, string filePath)
         {
@@ -19,7 +19,7 @@ namespace prjBuildApp.Models.Project
             DirectoryPath = directoryPath;
             FilePath = filePath;
             VersionManager = new VersionManager();
-            ReferencedProjects = new LinkedList<ProjectInfo>();
+            ReferencedProjects = new List<ProjectInfo>();
         }
 
         /// <summary>
@@ -28,35 +28,51 @@ namespace prjBuildApp.Models.Project
         /// <param name="globalSettings">Global application settings</param>
         /// <param name="solutionConfig">Solution-specific configuration</param>
         /// <param name="projectConfig">Project-specific configuration</param>
-        public void InitializeInheritedProperties(Settings? globalSettings, SolutionConfig? solutionConfig, ProjectConfig projectConfig)
+        public void InitializeInheritedProperties(Settings? globalSettings, SolutionConfig? solutionConfig, ProjectConfig? projectConfig)
         {
+            // Set IsObsolete from project configuration if available
             if (projectConfig != null)
             {
                 IsObsolete = projectConfig.IsObsolete;
-
-                // Merge ignore lists from all three levels: global, solution, and project
-                IgnoredObjectNames.Clear();
-                IgnoredObjectNames.AddRange(MergeIgnoreLists(
-                    globalSettings?.IgnoredObjectNames,
-                    solutionConfig?.IgnoredObjectNames,
-                    projectConfig.IgnoredObjectNames
-                ));
-
-                IgnoredObjectRelativePaths.Clear();
-                IgnoredObjectRelativePaths.AddRange(MergeIgnoreLists(
-                    globalSettings?.IgnoredObjectRelativePaths,
-                    solutionConfig?.IgnoredObjectRelativePaths,
-                    projectConfig.IgnoredObjectRelativePaths
-                ));
             }
+
+            // Merge ignore lists from all three levels: global, solution, and project
+            IgnoredObjectNames.Clear();
+            var mergedNames = new List<string>();
+            if (globalSettings?.IgnoredObjectNames != null)
+            {
+                mergedNames.AddRange(globalSettings.IgnoredObjectNames);
+            }
+
+            if (solutionConfig?.IgnoredObjectNames != null)
+            {
+                mergedNames.AddRange(solutionConfig.IgnoredObjectNames);
+            }
+
+            if (projectConfig?.IgnoredObjectNames != null)
+            {
+                mergedNames.AddRange(projectConfig.IgnoredObjectNames);
+            }
+            IgnoredObjectNames.AddRange(mergedNames.Distinct());
+
+            IgnoredObjectRelativePaths.Clear();
+            var mergedPaths = new List<string>();
+            if (globalSettings?.IgnoredObjectRelativePaths != null)
+            {
+                mergedPaths.AddRange(globalSettings.IgnoredObjectRelativePaths);
+            }
+
+            if (solutionConfig?.IgnoredObjectRelativePaths != null)
+            {
+                mergedPaths.AddRange(solutionConfig.IgnoredObjectRelativePaths);
+            }
+
+            if (projectConfig?.IgnoredObjectRelativePaths != null)
+            {
+                mergedPaths.AddRange(projectConfig.IgnoredObjectRelativePaths);
+            }
+            IgnoredObjectRelativePaths.AddRange(mergedPaths.Distinct());
         }
 
-        // Methods
-        public List<string> Build() => new();
-        public List<string> Restore() => new();
-        public List<string> UpdateNuGetPackages() => new();
-        public List<string> Cleanup() => new();
-        public List<string> Rebuild() => new();
-        public List<string> Archive() => new();
     }
 }
