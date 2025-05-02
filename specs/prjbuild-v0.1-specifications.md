@@ -1,10 +1,60 @@
 # prjBuild v0.1 Specifications
 
-## 1. Overview
+## Table of Contents
+
+1. [Introduction](#1-introduction)
+   1. [Overview](#11-overview)
+   2. [Purpose and Goals](#12-purpose-and-goals)
+2. [System Architecture](#2-system-architecture)
+   1. [Architectural Layers](#21-architectural-layers)
+   2. [Component Structure](#22-component-structure)
+   3. [Component Interactions](#23-component-interactions)
+3. [Core Components](#3-core-components)
+   1. [Configuration Management](#31-configuration-management)
+   2. [Logging System](#32-logging-system)
+   3. [File System Operations](#33-file-system-operations)
+   4. [Solution/Project Management](#34-solutionproject-management)
+   5. [Build and Archive Service](#35-build-and-archive-service)
+   6. [Command-line UI](#36-command-line-ui)
+4. [Data Models and Conventions](#4-data-models-and-conventions)
+   1. [Naming Conventions](#41-naming-conventions)
+   2. [Settings Model](#42-settings-model)
+   3. [Solution Model](#43-solution-model)
+   4. [Project Model](#44-project-model)
+5. [Key Features and Workflows](#5-key-features-and-workflows)
+   1. [Project Discovery Workflow](#51-project-discovery-workflow)
+   2. [Version and Reference Resolution](#52-version-and-reference-resolution)
+   3. [Project Selection and Operations](#53-project-selection-and-operations)
+   4. [Interactive Menu Options](#54-interactive-menu-options)
+6. [Technical Requirements](#6-technical-requirements)
+   1. [Development Environment](#61-development-environment)
+   2. [Runtime Requirements](#62-runtime-requirements)
+   3. [Dependencies](#63-dependencies)
+   4. [Performance Considerations](#64-performance-considerations)
+7. [Implementation Details](#7-implementation-details)
+   1. [Configuration System](#71-configuration-system)
+   2. [Logging System](#72-logging-system)
+   3. [Project Discovery](#73-project-discovery)
+   4. [Version Extraction](#74-version-extraction)
+   5. [Dependency Resolution](#75-dependency-resolution)
+   6. [Build Operations](#76-build-operations)
+   7. [Archive Operations](#77-archive-operations)
+8. [Error Handling and Validation](#8-error-handling-and-validation)
+   1. [Input Validation](#81-input-validation)
+   2. [Error Reporting](#82-error-reporting)
+   3. [Recovery Strategies](#83-recovery-strategies)
+9. [Future Enhancements](#9-future-enhancements)
+   1. [Planned Features](#91-planned-features)
+   2. [Extensibility Points](#92-extensibility-points)
+10. [Conclusion](#10-conclusion)
+
+## 1. Introduction
+
+### 1.1 Overview
 
 prjBuild is a .NET-based command-line application designed to automate the building and archiving of .NET projects across multiple repositories. It identifies changed projects, manages their dependencies, and provides an interactive interface for building, updating, and archiving these projects.
 
-## 2. Purpose
+### 1.2 Purpose and Goals
 
 The primary purpose of prjBuild is to streamline the development workflow by:
 
@@ -14,54 +64,79 @@ The primary purpose of prjBuild is to streamline the development workflow by:
 - Creating standardized archives of both binaries and source code
 - Supporting multiple target runtimes
 
-## 3. Architecture
+## 2. System Architecture
 
-### 3.1 Core Architecture
+### 2.1 Architectural Layers
 
-prjBuild follows a modular, layered architecture:
+prjBuild follows a modular, layered architecture consisting of three main layers:
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                     User Interface                       │
-│  (Command-line interface with interactive menu options)  │
-└───────────────────────────┬─────────────────────────────┘
-                            │
-┌───────────────────────────┴─────────────────────────────┐
-│                    Application Logic                     │
-│  (Project discovery, dependency resolution, operations)  │
-└───────────────────────────┬─────────────────────────────┘
-                            │
-┌───────────────────────────┴─────────────────────────────┐
-│                       Core Services                      │
-│  (Configuration, logging, file operations, .NET tools)   │
-└─────────────────────────────────────────────────────────┘
-```
+1. **User Interface Layer**
+   - Provides a command-line interface with interactive menu options
+   - Handles user input and displays information in a readable format
+   - Manages the interactive workflow for project operations
 
-### 3.2 Component Diagram
+2. **Application Logic Layer**
+   - Implements project discovery and analysis
+   - Handles dependency resolution between projects
+   - Coordinates operations like building, updating, and archiving
 
-```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│  Configuration  │     │     Logging     │     │  File System    │
-│    Management   │     │                 │     │   Operations    │
-└────────┬────────┘     └────────┬────────┘     └────────┬────────┘
-         │                       │                       │
-         └───────────────┬───────┴───────────────┬───────┘
-                         │                       │
-                ┌────────┴────────┐     ┌────────┴────────┐
-                │  Solution/Project│     │   Build and     │
-                │    Management   │     │ Archive Service │
-                └────────┬────────┘     └────────┬────────┘
-                         │                       │
-                         └───────────┬───────────┘
-                                     │
-                           ┌─────────┴─────────┐
-                           │  Command-line UI  │
-                           └───────────────────┘
-```
+3. **Core Services Layer**
+   - Manages configuration and settings
+   - Provides logging capabilities
+   - Handles file system operations
+   - Interfaces with .NET tools and commands
 
-## 4. Core Components
+This layered approach ensures separation of concerns and makes the application more maintainable and extensible.
 
-### 4.1 Configuration Management
+### 2.2 Component Structure
+
+The application consists of six main components that work together to provide the complete functionality:
+
+1. **Configuration Management**
+   - Loads and manages application settings
+   - Provides access to configuration values
+   - Handles platform-specific settings
+
+2. **Logging System**
+   - Records application activities and errors
+   - Outputs to both console and file
+   - Provides different log levels and formatting
+
+3. **File System Operations**
+   - Handles file and directory operations
+   - Manages file archiving and compression
+   - Provides path manipulation utilities
+
+4. **Solution/Project Management**
+   - Discovers and analyzes .NET solutions and projects
+   - Extracts version information
+   - Builds dependency graphs
+
+5. **Build and Archive Service**
+   - Executes build operations
+   - Updates NuGet packages
+   - Creates standardized archives
+
+6. **Command-line UI**
+   - Presents interactive menus
+   - Displays project information
+   - Reports progress and errors
+
+### 2.3 Component Interactions
+
+The components interact in the following manner:
+
+- The **Command-line UI** depends on both the **Solution/Project Management** and **Build and Archive Service** to present options and execute operations.
+- The **Solution/Project Management** and **Build and Archive Service** both rely on the three core services: **Configuration Management**, **Logging System**, and **File System Operations**.
+- All components use the **Logging System** to record their activities.
+- The **Configuration Management** component provides settings that influence the behavior of all other components.
+- The **File System Operations** component is used by most other components for file access and manipulation.
+
+This design allows for clear separation of responsibilities while enabling efficient collaboration between components.
+
+## 3. Core Components
+
+### 3.1 Configuration Management
 
 **Purpose**: Manage application settings and configuration.
 
@@ -75,7 +150,7 @@ prjBuild follows a modular, layered architecture:
 - Support environment variable expansion in configuration values
 - Provide validation for configuration values
 
-### 4.2 Logging System
+### 3.2 Logging System
 
 **Purpose**: Provide comprehensive logging capabilities.
 
@@ -90,7 +165,7 @@ prjBuild follows a modular, layered architecture:
 - JSON-formatted log entries
 - Configurable log file location and retention policy
 
-### 4.3 File System Operations
+### 3.3 File System Operations
 
 **Purpose**: Handle file and directory operations safely and efficiently.
 
@@ -106,7 +181,7 @@ prjBuild follows a modular, layered architecture:
 - Support for UTF-8 and other encodings
 - Efficient handling of large files
 
-### 4.4 Solution/Project Management
+### 3.4 Solution/Project Management
 
 **Purpose**: Discover, analyze, and manage .NET solutions and projects.
 
@@ -122,7 +197,7 @@ prjBuild follows a modular, layered architecture:
 - Build dependency graph for correct build ordering
 - Support for both SDK-style and legacy project formats
 
-### 4.5 Build and Archive Service
+### 3.5 Build and Archive Service
 
 **Purpose**: Build projects and create standardized archives.
 
@@ -138,7 +213,7 @@ prjBuild follows a modular, layered architecture:
 - Create ZIP archives with appropriate filtering
 - Handle build errors and warnings
 
-### 4.6 Command-line UI
+### 3.6 Command-line UI
 
 **Purpose**: Provide an interactive interface for the user.
 
@@ -154,9 +229,9 @@ prjBuild follows a modular, layered architecture:
 - Support for both interactive and non-interactive modes
 - Color-coded output for better readability
 
-## 5. Data Models
+## 4. Data Models and Conventions
 
-### 5.0 Naming Conventions
+### 4.1 Naming Conventions
 
 Throughout this document and the application code, the following naming conventions are used:
 
@@ -170,7 +245,7 @@ Throughout this document and the application code, the following naming conventi
 
 These conventions follow standard English usage patterns and help maintain consistency throughout the codebase.
 
-### 5.1 Settings Model
+### 4.2 Settings Model
 
 ```csharp
 public class Settings
@@ -193,7 +268,7 @@ public class RepositoryConfig
 }
 ```
 
-### 5.2 Solution Model
+### 4.3 Solution Model
 
 ```csharp
 public class SolutionInfo
@@ -210,7 +285,7 @@ public class SolutionInfo
 }
 ```
 
-### 5.3 Project Model
+### 4.4 Project Model
 
 ```csharp
 public class ProjectInfo
@@ -249,9 +324,9 @@ public class VersionInfo
 }
 ```
 
-## 6. Key Features and Workflows
+## 5. Key Features and Workflows
 
-### 6.1 Project Discovery Workflow
+### 5.1 Project Discovery Workflow
 
 1. Load configuration settings from appsettings.json
 2. For each repository directory in the configuration:
@@ -266,7 +341,7 @@ public class VersionInfo
      - Create ProjectInfo objects for valid projects
      - Associate projects with their solutions
 
-### 6.2 Version and Reference Resolution
+### 5.2 Version and Reference Resolution
 
 1. For each project:
    - Extract version information from project file, AssemblyInfo.cs, or app.manifest
@@ -275,7 +350,7 @@ public class VersionInfo
    - Resolve referenced projects
    - Build dependency graph using linked list structure
 
-### 6.3 Project Selection and Operations Workflow
+### 5.3 Project Selection and Operations
 
 1. Discover all projects across configured repositories
 2. Present list of all projects with selection status
@@ -292,72 +367,72 @@ public class VersionInfo
    - Archive
    - Exit
 
-### 6.4 Interactive Menu Options
+### 5.4 Interactive Menu Options
 
-#### 6.4.1 Update NuGet Packages
+#### 5.4.1 Update NuGet Packages
 - For each selected project:
   - List outdated packages
   - Update each package to the latest version
   - Display update output
   - Handle update errors
 
-#### 6.4.2 Restore Dependencies
+#### 5.4.2 Restore Dependencies
 - For each selected project:
   - Execute `dotnet restore` with appropriate options
   - Display restore output
   - Handle restore errors
 
-#### 6.4.3 Quick Build
+#### 5.4.3 Quick Build
 - For each selected project:
   - Execute `dotnet build` with appropriate options
   - Display build output
   - Handle build errors
 
-#### 6.4.4 Cleanup
+#### 5.4.4 Cleanup
 - For each selected project:
   - Remove bin and obj directories
   - Clean temporary files
   - Display cleanup output
   - Handle cleanup errors
 
-#### 6.4.5 Rebuild
+#### 5.4.5 Rebuild
 - For each selected project:
   - Clean the project
   - Rebuild the project for each supported runtime
   - Display rebuild output
   - Handle rebuild errors
 
-#### 6.4.6 Archive
+#### 5.4.6 Archive
 - For each selected project:
   - Archive the built binaries
   - Archive the source code
   - Display archive output
   - Handle archive errors
 
-## 7. Technical Requirements
+## 6. Technical Requirements
 
-### 7.1 Development Environment
+### 6.1 Development Environment
 - .NET 9.0 SDK
 - C# 12.0 or later
 - Visual Studio 2022 or later / Visual Studio Code with C# extensions
 
-### 7.2 Runtime Requirements
+### 6.2 Runtime Requirements
 - .NET 9.0 Runtime
 - Windows, macOS, or Linux operating system
 
-### 7.3 Dependencies
+### 6.3 Dependencies
 - System.CommandLine (for advanced command-line parsing)
 - System.Text.Json (for JSON configuration)
 - Serilog (for structured logging)
 
-### 7.4 Performance Considerations
+### 6.4 Performance Considerations
 - Efficient handling of large solutions with many projects
 - Minimal memory footprint
 - Responsive user interface even during long-running operations
 
-## 8. Implementation Details
+## 7. Implementation Details
 
-### 8.1 Configuration System
+### 7.1 Configuration System
 
 The configuration system will use appsettings.json:
 
@@ -384,7 +459,7 @@ public static async Task<Settings> LoadAsync()
 }
 ```
 
-### 8.2 Logging System
+### 7.2 Logging System
 
 The logging system will use Serilog for structured logging:
 
@@ -405,7 +480,7 @@ public static void ConfigureLogging()
 }
 ```
 
-### 8.3 Project Discovery
+### 7.3 Project Discovery
 
 Project discovery will search for projects in subdirectories:
 
@@ -436,7 +511,7 @@ public static List<ProjectInfo> DiscoverProjects(SolutionInfo solution)
 }
 ```
 
-### 8.4 Version Extraction
+### 7.4 Version Extraction
 
 Version extraction will support multiple sources and parse into components:
 
@@ -488,7 +563,7 @@ public VersionInfo ExtractVersion(string projectFilePath)
 }
 ```
 
-### 8.5 Dependency Resolution
+### 7.5 Dependency Resolution
 
 Dependency resolution will use a linked list structure for better traversal:
 
@@ -538,7 +613,7 @@ private void VisitProject(
 }
 ```
 
-### 8.6 Build Operations
+### 7.6 Build Operations
 
 Build and restore operations will be separate:
 
@@ -612,7 +687,7 @@ public List<string> Restore()
 }
 ```
 
-### 8.7 Archive Operations
+### 7.7 Archive Operations
 
 Archive operations will create ZIP files:
 
@@ -640,6 +715,58 @@ public List<string> Archive(List<string> notArchivedDirectoryNames, List<string>
     return messages;
 }
 ```
+
+## 8. Error Handling and Validation
+
+### 8.1 Input Validation
+
+The application will validate all inputs to ensure they meet the required format and constraints:
+
+- Configuration settings will be validated during loading
+- File paths will be checked for existence and accessibility
+- Project references will be validated for correctness
+- User input will be validated before processing
+
+### 8.2 Error Reporting
+
+Errors will be reported in a clear and consistent manner:
+
+- Console output will use color coding to highlight errors
+- Log files will contain detailed error information
+- Error messages will include context and suggestions where possible
+- Stack traces will be included for unexpected exceptions in debug mode
+
+### 8.3 Recovery Strategies
+
+The application will implement strategies to recover from common error conditions:
+
+- Automatic retry for transient failures (e.g., file access issues)
+- Graceful degradation when non-critical components fail
+- Safe rollback of partial operations
+- Preservation of state to allow resuming after failure
+
+## 9. Future Enhancements
+
+### 9.1 Planned Features
+
+The following features are planned for future versions:
+
+- Integration with CI/CD pipelines
+- Support for custom build steps and scripts
+- Parallel building of independent projects
+- Incremental builds based on file changes
+- Integration with source control systems
+- Web-based UI for remote management
+
+### 9.2 Extensibility Points
+
+The application is designed with the following extensibility points:
+
+- Plugin system for custom operations
+- Extensible configuration format
+- Custom build step hooks
+- Templating system for archive naming and organization
+- API for integration with other tools
 
 ## 10. Conclusion
 
