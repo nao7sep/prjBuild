@@ -190,10 +190,13 @@ This design allows for clear separation of responsibilities while enabling effic
 ```csharp
 public class Settings
 {
+    // Core configuration
     public List<RootDirectoryConfig> RootDirectories { get; set; }
-    public List<string> IgnoredObjectNames { get; set; }
-    public List<string> IgnoredObjectRelativePaths { get; set; }
     public List<SolutionConfig> Solutions { get; set; }
+
+    // Global ignore patterns
+    public List<string> IgnoredObjectNames { get; set; } // File system objects (files or directories) to ignore by name
+    public List<string> IgnoredObjectRelativePaths { get; set; } // File system objects to ignore by relative path
 }
 
 public class RootDirectoryConfig
@@ -211,10 +214,13 @@ public class SolutionConfig
 
 public class ProjectConfig
 {
+    // Core configuration
     public string Name { get; set; }
-    public List<string> IgnoredObjectNames { get; set; }
-    public List<string> IgnoredObjectRelativePaths { get; set; }
     public List<string> SupportedRuntimes { get; set; }
+
+    // Project-specific ignore patterns
+    public List<string> IgnoredObjectNames { get; set; } // File system objects (files or directories) to ignore by name
+    public List<string> IgnoredObjectRelativePaths { get; set; } // File system objects to ignore by relative path
 }
 ```
 
@@ -258,11 +264,11 @@ public class ProjectInfo
 ```csharp
 public enum VersionSourceType
 {
-    CsprojFile,
-    AssemblyInfo,
-    AssemblyFileInfo,
-    Manifest,
-    Other
+    CsprojFile,    // Version from project file
+    AssemblyInfo,  // Version from AssemblyInfo.cs
+    AssemblyFileInfo, // Version from assembly file version attribute
+    Manifest,      // Version from app.manifest
+    Other          // Version from other sources
 }
 
 public class VersionSource
@@ -290,13 +296,13 @@ public class VersionManager
 1. Load configuration settings from appsettings.json
 2. For each root directory in the configuration:
    - Enumerate directories in the root directory
-   - Filter out ignored objects based on names and relative paths
+   - Filter out ignored file system objects (files and directories) based on names and relative paths
    - Find solution files in each directory
    - Create SolutionInfo objects for valid solutions
    - Associate solutions with their parent root directory
    - For each solution:
      - Find project directories (including subdirectories)
-     - Filter out ignored objects
+     - Filter out ignored file system objects (files and directories)
      - Find project files in each directory
      - Create ProjectInfo objects for valid projects
      - Associate projects with their solutions
@@ -368,8 +374,8 @@ public class VersionManager
 - For each selected project:
   - Retrieve supported runtimes from project configuration
   - Archive the built binaries for each supported runtime
-  - Retrieve ignored object settings from project configuration
-  - Archive the source code, excluding ignored objects
+  - Retrieve ignored file system object settings (names and relative paths) from project configuration
+  - Archive the source code, excluding ignored file system objects (files and directories)
   - Display archive output
   - Handle archive errors
 
