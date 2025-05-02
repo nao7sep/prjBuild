@@ -9,8 +9,8 @@ namespace prjBuildApp.Models.Configuration
         public List<SolutionConfig> Solutions { get; set; } = new();
 
         // Global ignore patterns
-        public List<string> IgnoredObjectNames { get; set; } = new(); // File system objects (files or directories) to ignore by name
-        public List<string> IgnoredObjectRelativePaths { get; set; } = new(); // File system objects to ignore by relative path
+        public List<string> IgnoredObjectNames { get; set; } = new();
+        public List<string> IgnoredObjectRelativePaths { get; set; } = new();
     }
 
     public class RootDirectoryConfig
@@ -33,7 +33,7 @@ namespace prjBuildApp.Models.Configuration
         public List<string> SupportedRuntimes { get; set; } = new();
 
         // Project-specific ignore patterns
-        public List<string> IgnoredObjectNames { get; set; } = new(); // File system objects (files or directories) to ignore by name
-        public List<string> IgnoredObjectRelativePaths { get; set; } = new(); // File system objects to ignore by relative path
+        public List<string> IgnoredObjectNames { get; set; } = new();
+        public List<string> IgnoredObjectRelativePaths { get; set; } = new();
     }
 }

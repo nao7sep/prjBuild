@@ -195,8 +195,8 @@ public class Settings
     public List<SolutionConfig> Solutions { get; set; }
 
     // Global ignore patterns
-    public List<string> IgnoredObjectNames { get; set; } // File system objects (files or directories) to ignore by name
-    public List<string> IgnoredObjectRelativePaths { get; set; } // File system objects to ignore by relative path
+    public List<string> IgnoredObjectNames { get; set; }
+    public List<string> IgnoredObjectRelativePaths { get; set; }
 }
 
 public class RootDirectoryConfig
@@ -219,8 +219,8 @@ public class ProjectConfig
     public List<string> SupportedRuntimes { get; set; }
 
     // Project-specific ignore patterns
-    public List<string> IgnoredObjectNames { get; set; } // File system objects (files or directories) to ignore by name
-    public List<string> IgnoredObjectRelativePaths { get; set; } // File system objects to ignore by relative path
+    public List<string> IgnoredObjectNames { get; set; }
+    public List<string> IgnoredObjectRelativePaths { get; set; }
 }
 ```
 
