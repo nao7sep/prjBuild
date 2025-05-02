@@ -54,6 +54,14 @@ namespace prjBuildApp.Services
                         _loggingService.Information("Found solution: {SolutionName} at {SolutionFile}", solutionName, solutionFile);
 
                         var solution = new SolutionInfo(solutionName, directory, solutionFile);
+
+                        // Set IsObsolete from configuration if available
+                        var solutionConfig = _settings.Solutions.FirstOrDefault(s => s.Name == solutionName);
+                        if (solutionConfig != null)
+                        {
+                            solution.IsObsolete = solutionConfig.IsObsolete;
+                        }
+
                         _solutions.Add(solution);
 
                         // Discover projects in the solution
@@ -87,6 +95,18 @@ namespace prjBuildApp.Services
                 _loggingService.Information("Found project: {ProjectName} at {ProjectFile}", projectName, projectFile);
 
                 var project = new ProjectInfo(solution, projectName, projectDirectory, projectFile);
+
+                // Set IsObsolete from configuration if available
+                var solutionConfig = _settings.Solutions.FirstOrDefault(s => s.Name == solution.Name);
+                if (solutionConfig != null)
+                {
+                    var projectConfig = solutionConfig.Projects.FirstOrDefault(p => p.Name == projectName);
+                    if (projectConfig != null)
+                    {
+                        project.IsObsolete = projectConfig.IsObsolete;
+                    }
+                }
+
                 solution.Projects.Add(project);
 
                 // Extract version information

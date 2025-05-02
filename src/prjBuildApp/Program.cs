@@ -49,7 +49,7 @@ namespace prjBuildApp
 
                 // Log the error to a file
                 File.AppendAllText(
-                    Path.Combine("logs", $"prjBuild-error-{DateTime.Now:yyyyMMdd}.log"),
+                    Path.Combine("logs", $"prjBuild-error-{DateTime.Now:yyyyMMdd-HHmmss}.log"),
                     $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} [FATAL] {ex.Message}{Environment.NewLine}{ex.StackTrace}{Environment.NewLine}"
                 );
             }

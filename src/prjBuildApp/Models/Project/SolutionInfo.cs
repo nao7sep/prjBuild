@@ -9,6 +9,7 @@ namespace prjBuildApp.Models.Project
         public string FilePath { get; }
         public List<ProjectInfo> Projects { get; } = new();
         public string SourceArchivePath { get; set; }
+        public bool IsObsolete { get; set; }
 
         public SolutionInfo(string name, string directoryPath, string filePath)
         {
@@ -16,6 +17,7 @@ namespace prjBuildApp.Models.Project
             DirectoryPath = directoryPath;
             FilePath = filePath;
             SourceArchivePath = string.Empty;
+            IsObsolete = false;
         }
     }
 }

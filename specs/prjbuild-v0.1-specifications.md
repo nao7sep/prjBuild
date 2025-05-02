@@ -208,6 +208,7 @@ public class RootDirectoryConfig
 public class SolutionConfig
 {
     public string Name { get; set; }
+    public bool IsObsolete { get; set; }
     public RootDirectoryConfig ParentRootDirectory { get; set; }
     public List<ProjectConfig> Projects { get; set; }
 }
@@ -216,6 +217,7 @@ public class ProjectConfig
 {
     // Core configuration
     public string Name { get; set; }
+    public bool IsObsolete { get; set; }
     public List<string> SupportedRuntimes { get; set; }
 
     // Project-specific ignore patterns
@@ -234,6 +236,7 @@ public class SolutionInfo
     public string FilePath { get; }
     public List<ProjectInfo> Projects { get; }
     public string SourceArchivePath { get; }
+    public bool IsObsolete { get; set; }
 }
 ```
 
@@ -248,6 +251,7 @@ public class ProjectInfo
     public string FilePath { get; }
     public VersionManager VersionManager { get; }
     public LinkedList<ProjectInfo> ReferencedProjects { get; }
+    public bool IsObsolete { get; set; }
 
     // Methods
     public List<string> Build();
@@ -320,12 +324,14 @@ public class VersionManager
 ### 5.3 Project Selection and Operations
 
 1. Discover all projects across configured root directories
-2. Present list of all projects with selection status
-3. Provide options to:
+2. Filter out obsolete solutions and projects unless explicitly shown
+3. Present list of all visible projects with selection status
+4. Provide options to:
    - Select/deselect individual projects
    - Select/deselect all projects
    - Select projects by pattern or criteria
-4. For selected projects, present operations menu:
+   - Toggle display of obsolete solutions and projects
+5. For selected projects, present operations menu:
    - Update NuGet packages
    - Restore dependencies
    - Quick build (for testing)

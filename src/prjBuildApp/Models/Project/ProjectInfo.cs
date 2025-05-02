@@ -10,6 +10,7 @@ namespace prjBuildApp.Models.Project
         public string FilePath { get; }
         public VersionManager VersionManager { get; }
         public LinkedList<ProjectInfo> ReferencedProjects { get; }
+        public bool IsObsolete { get; set; }
 
         public ProjectInfo(SolutionInfo solution, string name, string directoryPath, string filePath)
         {
@@ -19,6 +20,7 @@ namespace prjBuildApp.Models.Project
             FilePath = filePath;
             VersionManager = new VersionManager();
             ReferencedProjects = new LinkedList<ProjectInfo>();
+            IsObsolete = false;
         }
 
         // Methods

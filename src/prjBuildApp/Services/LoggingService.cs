@@ -24,8 +24,7 @@ namespace prjBuildApp.Services
                     .ReadFrom.Configuration(configuration)
                     .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
                     .WriteTo.File(
-                        Path.Combine(logsDirectory, "prjBuild-.log"),
-                        rollingInterval: RollingInterval.Day,
+                        Path.Combine(logsDirectory, $"prjBuild-{DateTime.Now:yyyyMMdd-HHmmss}.log"),
                         outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
                     .CreateLogger();
 

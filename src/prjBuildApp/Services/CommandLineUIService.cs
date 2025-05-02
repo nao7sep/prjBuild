@@ -13,6 +13,7 @@ namespace prjBuildApp.Services
         private readonly BuildService _buildService;
 
         private readonly List<ProjectInfo> _selectedProjects = new();
+        private bool _showObsoleteItems = false;
 
         public CommandLineUIService(
             LoggingService loggingService,
@@ -73,6 +74,9 @@ namespace prjBuildApp.Services
                         }
                         break;
                     case "6":
+                        ToggleObsoleteItemsDisplay();
+                        break;
+                    case "7":
                     case "q":
                     case "quit":
                     case "exit":
@@ -95,7 +99,8 @@ namespace prjBuildApp.Services
 
             // Display all projects with selection status
             var allProjects = _projectManagementService.Solutions
-                .SelectMany(s => s.Projects)
+                .Where(s => _showObsoleteItems || !s.IsObsolete)
+                .SelectMany(s => s.Projects.Where(p => _showObsoleteItems || !p.IsObsolete))
                 .OrderBy(p => p.Solution.Name)
                 .ThenBy(p => p.Name)
                 .ToList();
@@ -115,14 +120,16 @@ namespace prjBuildApp.Services
             Console.WriteLine("3. Select all projects");
             Console.WriteLine("4. Deselect all projects");
             Console.WriteLine("5. Operations menu");
-            Console.WriteLine("6. Exit");
+            Console.WriteLine($"6. {(_showObsoleteItems ? "Hide" : "Show")} obsolete items");
+            Console.WriteLine("7. Exit");
             Console.WriteLine();
         }
 
         private void SelectProject()
         {
             var allProjects = _projectManagementService.Solutions
-                .SelectMany(s => s.Projects)
+                .Where(s => _showObsoleteItems || !s.IsObsolete)
+                .SelectMany(s => s.Projects.Where(p => _showObsoleteItems || !p.IsObsolete))
                 .OrderBy(p => p.Solution.Name)
                 .ThenBy(p => p.Name)
                 .ToList();
@@ -187,9 +194,9 @@ namespace prjBuildApp.Services
         {
             _selectedProjects.Clear();
 
-            foreach (var solution in _projectManagementService.Solutions)
+            foreach (var solution in _projectManagementService.Solutions.Where(s => _showObsoleteItems || !s.IsObsolete))
             {
-                foreach (var project in solution.Projects)
+                foreach (var project in solution.Projects.Where(p => _showObsoleteItems || !p.IsObsolete))
                 {
                     _selectedProjects.Add(project);
                 }
@@ -206,6 +213,14 @@ namespace prjBuildApp.Services
             _selectedProjects.Clear();
 
             Console.WriteLine($"Deselected all {count} projects.");
+            Console.WriteLine("Press any key to continue...");
+            Console.ReadKey();
+        }
+
+        private void ToggleObsoleteItemsDisplay()
+        {
+            _showObsoleteItems = !_showObsoleteItems;
+            Console.WriteLine($"{(_showObsoleteItems ? "Showing" : "Hiding")} obsolete items.");
             Console.WriteLine("Press any key to continue...");
             Console.ReadKey();
         }
