@@ -18,4 +18,25 @@
         <RepositoryUrl>https://github.com/nao7sep/prjBuild</RepositoryUrl>
     </PropertyGroup>
 
+    <ItemGroup>
+        <!-- Configuration -->
+        <PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="9.0.0" />
+
+        <!-- Logging -->
+        <PackageReference Include="Serilog" Version="3.1.1" />
+        <PackageReference Include="Serilog.Settings.Configuration" Version="8.0.0" />
+        <PackageReference Include="Serilog.Sinks.Console" Version="5.0.1" />
+        <PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
+
+        <!-- Command Line -->
+        <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Update="appsettings.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+    </ItemGroup>
 </Project>
