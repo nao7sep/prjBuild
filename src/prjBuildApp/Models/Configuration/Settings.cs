@@ -25,6 +25,10 @@ namespace prjBuildApp.Models.Configuration
         public bool IsObsolete { get; set; } = false;
         public RootDirectoryConfig? ParentRootDirectory { get; set; }
         public List<ProjectConfig> Projects { get; set; } = new();
+
+        // Solution-specific ignore patterns
+        public List<string> IgnoredObjectNames { get; set; } = new();
+        public List<string> IgnoredObjectRelativePaths { get; set; } = new();
     }
 
     public class ProjectConfig

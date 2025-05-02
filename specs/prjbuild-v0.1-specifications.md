@@ -211,6 +211,10 @@ public class SolutionConfig
     public bool IsObsolete { get; set; }
     public RootDirectoryConfig ParentRootDirectory { get; set; }
     public List<ProjectConfig> Projects { get; set; }
+
+    // Solution-specific ignore patterns
+    public List<string> IgnoredObjectNames { get; set; }
+    public List<string> IgnoredObjectRelativePaths { get; set; }
 }
 
 public class ProjectConfig
@@ -226,24 +230,40 @@ public class ProjectConfig
 }
 ```
 
-### 4.2 Solution Model
+### 4.2 Inherited Properties Base Model
 
 ```csharp
-public class SolutionInfo
+public abstract class InheritedPropertiesBase
+{
+    public bool IsObsolete { get; set; }
+    public List<string> IgnoredObjectNames { get; }
+    public List<string> IgnoredObjectRelativePaths { get; }
+
+    // Helper method for merging ignore lists
+    protected static List<string> MergeIgnoreLists(params IEnumerable<string>[] sources);
+}
+```
+
+### 4.3 Solution Model
+
+```csharp
+public class SolutionInfo : InheritedPropertiesBase
 {
     public string Name { get; }
     public string DirectoryPath { get; }
     public string FilePath { get; }
     public List<ProjectInfo> Projects { get; }
     public string SourceArchivePath { get; }
-    public bool IsObsolete { get; set; }
+
+    // Method to initialize inherited properties
+    public void InitializeInheritedProperties(Settings globalSettings, SolutionConfig solutionConfig);
 }
 ```
 
-### 4.3 Project Model
+### 4.4 Project Model
 
 ```csharp
-public class ProjectInfo
+public class ProjectInfo : InheritedPropertiesBase
 {
     public SolutionInfo Solution { get; }
     public string Name { get; }
@@ -251,7 +271,9 @@ public class ProjectInfo
     public string FilePath { get; }
     public VersionManager VersionManager { get; }
     public LinkedList<ProjectInfo> ReferencedProjects { get; }
-    public bool IsObsolete { get; set; }
+
+    // Method to initialize inherited properties
+    public void InitializeInheritedProperties(Settings globalSettings, SolutionConfig solutionConfig, ProjectConfig projectConfig);
 
     // Methods
     public List<string> Build();
@@ -263,7 +285,7 @@ public class ProjectInfo
 }
 ```
 
-### 4.4 Version Management Model
+### 4.5 Version Management Model
 
 ```csharp
 public enum VersionSourceType
@@ -380,7 +402,7 @@ public class VersionManager
 - For each selected project:
   - Retrieve supported runtimes from project configuration
   - Archive the built binaries for each supported runtime
-  - Retrieve ignored file system object settings (names and relative paths) from project configuration
+  - Use the merged ignored file system object settings (names and relative paths) from global, solution, and project configurations
   - Archive the source code, excluding ignored file system objects (files and directories)
   - Display archive output
   - Handle archive errors
