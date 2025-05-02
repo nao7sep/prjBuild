@@ -20,6 +20,7 @@
    1. [Settings Model](#41-settings-model)
    2. [Solution Model](#42-solution-model)
    3. [Project Model](#43-project-model)
+   4. [Version Management Model](#44-version-management-model)
 5. [Key Features and Workflows](#5-key-features-and-workflows)
    1. [Project Discovery Workflow](#51-project-discovery-workflow)
    2. [Version and Reference Resolution](#52-version-and-reference-resolution)
@@ -34,7 +35,6 @@
    1. [Input Validation](#71-input-validation)
    2. [Error Reporting](#72-error-reporting)
    3. [Recovery Strategies](#73-recovery-strategies)
-8. [Conclusion](#8-conclusion)
 
 ## 1. Introduction
 
@@ -190,21 +190,32 @@ This design allows for clear separation of responsibilities while enabling effic
 ```csharp
 public class Settings
 {
-    public List<RepositoryConfig> Repositories { get; set; }
+    public List<RootDirectoryConfig> RootDirectories { get; set; }
     public List<string> IgnoredDirectoryNames { get; set; }
-    public List<string> ObsoleteSolutionNames { get; set; }
-    public List<string> ObsoleteProjectNames { get; set; }
-    public List<string> SupportedRuntimes { get; set; }
-    public List<string> NotArchivedDirectoryPaths { get; set; }
-    public List<string> NotArchivedFilePaths { get; set; }
-    public List<string> NotArchivedDirectoryNames { get; set; }
-    public List<string> NotArchivedFileNames { get; set; }
+    public List<string> IgnoredFileNames { get; set; }
+    public List<string> IgnoredRelativePaths { get; set; }
+    public List<SolutionConfig> Solutions { get; set; }
 }
 
-public class RepositoryConfig
+public class RootDirectoryConfig
 {
     public string DirectoryPath { get; set; }
     public string ArchiveDirectoryPath { get; set; }
+}
+
+public class SolutionConfig
+{
+    public string Name { get; set; }
+    public List<ProjectConfig> Projects { get; set; }
+}
+
+public class ProjectConfig
+{
+    public string Name { get; set; }
+    public List<string> IgnoredDirectoryNames { get; set; }
+    public List<string> IgnoredFileNames { get; set; }
+    public List<string> IgnoredRelativePaths { get; set; }
+    public List<string> SupportedRuntimes { get; set; }
 }
 ```
 
@@ -216,12 +227,8 @@ public class SolutionInfo
     public string Name { get; }
     public string DirectoryPath { get; }
     public string FilePath { get; }
-    public bool IsObsolete { get; }
     public List<ProjectInfo> Projects { get; }
     public string SourceArchivePath { get; }
-
-    // Methods
-    public List<string> Archive(List<string> notArchivedDirectoryNames, List<string> notArchivedFileNames, List<string> notArchivedFilePaths, List<string> notArchivedDirectoryPaths);
 }
 ```
 
@@ -234,28 +241,51 @@ public class ProjectInfo
     public string Name { get; }
     public string DirectoryPath { get; }
     public string FilePath { get; }
-    public VersionInfo Version { get; }
+    public VersionManager VersionManager { get; }
     public LinkedList<ProjectInfo> ReferencedProjects { get; }
+    public List<string> IgnoredDirectoryNames { get; }
+    public List<string> IgnoredFileNames { get; }
+    public List<string> IgnoredRelativePaths { get; }
+    public List<string> SupportedRuntimes { get; }
 
     // Methods
     public List<string> Build();
     public List<string> Restore();
     public List<string> UpdateNuGetPackages();
     public List<string> Cleanup();
-    public List<string> Rebuild(List<string> supportedRuntimes);
-    public List<string> Archive(List<string> supportedRuntimes, List<string> notArchivedDirectoryNames, List<string> notArchivedFileNames, List<string> notArchivedFilePaths, List<string> notArchivedDirectoryPaths);
+    public List<string> Rebuild();
+    public List<string> Archive();
+}
+```
+
+### 4.4 Version Management Model
+
+```csharp
+public enum VersionSourceType
+{
+    CsprojFile,
+    AssemblyInfo,
+    AssemblyFileInfo,
+    Manifest,
+    Other
 }
 
-public class VersionInfo
+public class VersionSource
 {
-    // Source properties
-    public string? CsprojVersion { get; }
-    public string? AssemblyVersion { get; }
-    public string? AssemblyFileVersion { get; }
-    public string? ManifestVersion { get; }
+    public VersionSourceType SourceType { get; }
+    public string FilePath { get; }
+    public string VersionString { get; }
+    public Version ParsedVersion { get; }
+}
+
+public class VersionManager
+{
+    public List<VersionSource> VersionSources { get; }
 
     // Methods
     public string GetVersion();
+    public bool ValidateVersions();
+    public VersionSource GetPrimaryVersionSource();
 }
 ```
 
@@ -264,14 +294,14 @@ public class VersionInfo
 ### 5.1 Project Discovery Workflow
 
 1. Load configuration settings from appsettings.json
-2. For each repository directory in the configuration:
-   - Enumerate directories in the repository directory
-   - Filter out ignored directories
+2. For each root directory in the configuration:
+   - Enumerate directories in the root directory
+   - Filter out ignored directories and files based on names and relative paths
    - Find solution files in each directory
    - Create SolutionInfo objects for valid solutions
    - For each solution:
      - Find project directories (including subdirectories)
-     - Filter out ignored directories
+     - Filter out ignored directories and files
      - Find project files in each directory
      - Create ProjectInfo objects for valid projects
      - Associate projects with their solutions
@@ -279,15 +309,16 @@ public class VersionInfo
 ### 5.2 Version and Reference Resolution
 
 1. For each project:
-   - Extract version information from project file, AssemblyInfo.cs, or app.manifest
-   - Store version information in VersionInfo object
+   - Extract version information from various sources (project file, AssemblyInfo.cs, app.manifest)
+   - Create VersionSource objects for each source
+   - Add these to the project's VersionManager
    - Extract project references from project file
    - Resolve referenced projects
    - Build dependency graph using linked list structure
 
 ### 5.3 Project Selection and Operations
 
-1. Discover all projects across configured repositories
+1. Discover all projects across configured root directories
 2. Present list of all projects with selection status
 3. Provide options to:
    - Select/deselect individual projects
@@ -333,14 +364,14 @@ public class VersionInfo
 #### 5.4.5 Rebuild
 - For each selected project:
   - Clean the project
-  - Rebuild the project for each supported runtime
+  - Rebuild the project for each supported runtime defined in the project's configuration
   - Display rebuild output
   - Handle rebuild errors
 
 #### 5.4.6 Archive
 - For each selected project:
-  - Archive the built binaries for each supported runtime
-  - Archive the source code
+  - Archive the built binaries for each supported runtime defined in the project's configuration
+  - Archive the source code, excluding directories and files specified in the project's ignored lists
   - Display archive output
   - Handle archive errors
 
@@ -394,6 +425,4 @@ The application will implement strategies to recover from common error condition
 - Safe rollback of partial operations
 - Preservation of state to allow resuming after failure
 
-## 8. Conclusion
-
-prjBuild v0.1 provides a solid foundation for automating the build and archive process for .NET projects. By implementing the specifications outlined in this document, the application will offer a significant improvement in developer productivity and build consistency.
+That's the end of the v0.1 specification.
