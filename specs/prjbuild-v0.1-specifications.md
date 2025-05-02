@@ -17,7 +17,7 @@
    5. [Build and Archive Service](#35-build-and-archive-service)
    6. [Command-line UI](#36-command-line-ui)
 4. [Data Models](#4-data-models)
-   1. [Settings Model](#41-settings-model)
+   1. [Configuration Model](#41-configuration-model)
    2. [Solution Model](#42-solution-model)
    3. [Project Model](#43-project-model)
    4. [Version Management Model](#44-version-management-model)
@@ -69,7 +69,7 @@ prjBuild follows a modular, layered architecture consisting of three main layers
    - Coordinates operations like building, updating, and archiving
 
 3. **Core Services Layer**
-   - Manages configuration and settings
+   - Manages configuration settings
    - Provides logging capabilities
    - Handles file system operations
    - Interfaces with .NET tools and commands
@@ -185,15 +185,14 @@ This design allows for clear separation of responsibilities while enabling effic
 
 ## 4. Data Models
 
-### 4.1 Settings Model
+### 4.1 Configuration Model
 
 ```csharp
 public class Settings
 {
     public List<RootDirectoryConfig> RootDirectories { get; set; }
-    public List<string> IgnoredDirectoryNames { get; set; }
-    public List<string> IgnoredFileNames { get; set; }
-    public List<string> IgnoredRelativePaths { get; set; }
+    public List<string> IgnoredObjectNames { get; set; }
+    public List<string> IgnoredObjectRelativePaths { get; set; }
     public List<SolutionConfig> Solutions { get; set; }
 }
 
@@ -206,15 +205,15 @@ public class RootDirectoryConfig
 public class SolutionConfig
 {
     public string Name { get; set; }
+    public RootDirectoryConfig ParentRootDirectory { get; set; }
     public List<ProjectConfig> Projects { get; set; }
 }
 
 public class ProjectConfig
 {
     public string Name { get; set; }
-    public List<string> IgnoredDirectoryNames { get; set; }
-    public List<string> IgnoredFileNames { get; set; }
-    public List<string> IgnoredRelativePaths { get; set; }
+    public List<string> IgnoredObjectNames { get; set; }
+    public List<string> IgnoredObjectRelativePaths { get; set; }
     public List<string> SupportedRuntimes { get; set; }
 }
 ```
@@ -243,10 +242,6 @@ public class ProjectInfo
     public string FilePath { get; }
     public VersionManager VersionManager { get; }
     public LinkedList<ProjectInfo> ReferencedProjects { get; }
-    public List<string> IgnoredDirectoryNames { get; }
-    public List<string> IgnoredFileNames { get; }
-    public List<string> IgnoredRelativePaths { get; }
-    public List<string> SupportedRuntimes { get; }
 
     // Methods
     public List<string> Build();
@@ -283,7 +278,6 @@ public class VersionManager
     public List<VersionSource> VersionSources { get; }
 
     // Methods
-    public string GetVersion();
     public bool ValidateVersions();
     public VersionSource GetPrimaryVersionSource();
 }
@@ -296,12 +290,13 @@ public class VersionManager
 1. Load configuration settings from appsettings.json
 2. For each root directory in the configuration:
    - Enumerate directories in the root directory
-   - Filter out ignored directories and files based on names and relative paths
+   - Filter out ignored objects based on names and relative paths
    - Find solution files in each directory
    - Create SolutionInfo objects for valid solutions
+   - Associate solutions with their parent root directory
    - For each solution:
      - Find project directories (including subdirectories)
-     - Filter out ignored directories and files
+     - Filter out ignored objects
      - Find project files in each directory
      - Create ProjectInfo objects for valid projects
      - Associate projects with their solutions
@@ -364,14 +359,17 @@ public class VersionManager
 #### 5.4.5 Rebuild
 - For each selected project:
   - Clean the project
-  - Rebuild the project for each supported runtime defined in the project's configuration
+  - Retrieve supported runtimes from project configuration
+  - Rebuild the project for each supported runtime
   - Display rebuild output
   - Handle rebuild errors
 
 #### 5.4.6 Archive
 - For each selected project:
-  - Archive the built binaries for each supported runtime defined in the project's configuration
-  - Archive the source code, excluding directories and files specified in the project's ignored lists
+  - Retrieve supported runtimes from project configuration
+  - Archive the built binaries for each supported runtime
+  - Retrieve ignored object settings from project configuration
+  - Archive the source code, excluding ignored objects
   - Display archive output
   - Handle archive errors
 
@@ -425,4 +423,4 @@ The application will implement strategies to recover from common error condition
 - Safe rollback of partial operations
 - Preservation of state to allow resuming after failure
 
-That's the end of the v0.1 specification.
+End of specification.
