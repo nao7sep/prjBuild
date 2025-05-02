@@ -66,15 +66,13 @@ prjBuild follows a modular, layered architecture:
 **Purpose**: Manage application settings and configuration.
 
 **Key Features**:
-- Load settings from JSON configuration files
-- Support for both public (repository-level) and private (user-level) settings
-- Merge settings from multiple sources with appropriate precedence
+- Load settings from appsettings.json configuration file
 - Provide strongly-typed access to configuration values
+- Support platform-specific settings in a single configuration file
 
 **Implementation Details**:
 - Use `System.Text.Json` for JSON parsing
 - Support environment variable expansion in configuration values
-- Implement change tracking for configuration modifications
 - Provide validation for configuration values
 
 ### 4.2 Logging System
@@ -85,13 +83,11 @@ prjBuild follows a modular, layered architecture:
 - Log to both console and file simultaneously
 - Support different log levels (Info, Warning, Error, Debug)
 - Color-coded console output for better readability
-- Structured logging for machine-readable logs
-- Log rotation and archiving
+- Structured logging using NDJSON format
 
 **Implementation Details**:
-- Use custom logging implementation for maximum control
-- Support for indentation levels in log messages
-- Automatic timestamp and log level prefixing
+- Use Serilog for logging implementation
+- JSON-formatted log entries
 - Configurable log file location and retention policy
 
 ### 4.3 File System Operations
@@ -115,7 +111,7 @@ prjBuild follows a modular, layered architecture:
 **Purpose**: Discover, analyze, and manage .NET solutions and projects.
 
 **Key Features**:
-- Solution and project discovery
+- Solution and project discovery across multiple directories
 - Project reference resolution
 - Version extraction and validation
 - Dependency graph construction
@@ -138,7 +134,7 @@ prjBuild follows a modular, layered architecture:
 
 **Implementation Details**:
 - Use `dotnet` CLI commands for building and package management
-- Implement clean, build, and publish operations
+- Implement clean, build, restore, and publish operations
 - Create ZIP archives with appropriate filtering
 - Handle build errors and warnings
 
@@ -160,18 +156,40 @@ prjBuild follows a modular, layered architecture:
 
 ## 5. Data Models
 
+### 5.0 Naming Conventions
+
+Throughout this document and the application code, the following naming conventions are used:
+
+- **Singular nouns as adjectives**: When a noun is used as an adjective to describe another noun, the singular form is used even when it conceptually represents multiple items. For example:
+  - `SourceArchivePath` (not "SourcesArchivePath") - A path to an archive containing source code
+  - `ArchiveDirectoryPath` (not "ArchivesDirectoryPath") - A path to a directory containing archives
+
+- **Plural for collections**: Collections of items use the plural form. For example:
+  - `NotArchivedDirectoryNames` - A list of directory names that should not be archived
+  - `Repositories` - A list of repository configurations
+
+These conventions follow standard English usage patterns and help maintain consistency throughout the codebase.
+
 ### 5.1 Settings Model
 
 ```csharp
 public class Settings
 {
-    public string RepositoriesDirectoryPath { get; set; }
-    public string ArchivesDirectoryPath { get; set; }
+    public List<RepositoryConfig> Repositories { get; set; }
     public List<string> IgnoredDirectoryNames { get; set; }
     public List<string> ObsoleteSolutionNames { get; set; }
+    public List<string> ObsoleteProjectNames { get; set; }
     public List<string> SupportedRuntimes { get; set; }
+    public List<string> NotArchivedDirectoryPaths { get; set; }
+    public List<string> NotArchivedFilePaths { get; set; }
     public List<string> NotArchivedDirectoryNames { get; set; }
     public List<string> NotArchivedFileNames { get; set; }
+}
+
+public class RepositoryConfig
+{
+    public string DirectoryPath { get; set; }
+    public string ArchiveDirectoryPath { get; set; }
 }
 ```
 
@@ -185,8 +203,7 @@ public class SolutionInfo
     public string FilePath { get; }
     public bool IsObsolete { get; }
     public List<ProjectInfo> Projects { get; }
-    public string CommonVersionString { get; }
-    public string SourceArchiveFilePath { get; }
+    public string SourceArchivePath { get; }
 
     // Methods
     public List<string> Archive(List<string> notArchivedDirectoryNames, List<string> notArchivedFileNames);
@@ -202,16 +219,33 @@ public class ProjectInfo
     public string Name { get; }
     public string DirectoryPath { get; }
     public string FilePath { get; }
-    public string VersionString { get; }
-    public List<ProjectInfo> ReferencedProjects { get; }
+    public VersionInfo Version { get; }
+    public LinkedList<ProjectInfo> ReferencedProjects { get; }
 
     // Methods
-    public List<string> Build(bool noRestore);
+    public List<string> Build();
+    public List<string> Restore();
     public List<string> UpdateNuGetPackages();
-    public List<string> Clean(List<string> supportedRuntimes, bool deleteObjDirectory);
-    public List<string> RebuildAndArchive(List<string> supportedRuntimes,
-                                         List<string> notArchivedDirectoryNames,
-                                         List<string> notArchivedFileNames);
+    public List<string> Cleanup(List<string> supportedRuntimes, bool deleteObjDirectory);
+    public List<string> Rebuild(List<string> supportedRuntimes);
+    public List<string> Archive(List<string> notArchivedDirectoryNames, List<string> notArchivedFileNames);
+}
+
+public class VersionInfo
+{
+    public int? Major { get; }
+    public int? Minor { get; }
+    public int? Build { get; }
+    public int? Revision { get; }
+
+    // Source properties
+    public string? CsprojVersion { get; }
+    public string? AssemblyVersion { get; }
+    public string? AssemblyFileVersion { get; }
+    public string? ManifestVersion { get; }
+
+    // Methods
+    public string GetVersion();
 }
 ```
 
@@ -219,67 +253,86 @@ public class ProjectInfo
 
 ### 6.1 Project Discovery Workflow
 
-1. Load configuration settings
-2. Enumerate directories in the repositories directory
-3. Filter out ignored directories
-4. Find solution files in each directory
-5. Create SolutionInfo objects for valid solutions
-6. For each solution:
-   - Find project directories
+1. Load configuration settings from appsettings.json
+2. For each repository directory in the configuration:
+   - Enumerate directories in the repository directory
    - Filter out ignored directories
-   - Find project files in each directory
-   - Create ProjectInfo objects for valid projects
-   - Associate projects with their solutions
+   - Find solution files in each directory
+   - Create SolutionInfo objects for valid solutions
+   - For each solution:
+     - Find project directories (including subdirectories)
+     - Filter out ignored directories
+     - Find project files in each directory
+     - Create ProjectInfo objects for valid projects
+     - Associate projects with their solutions
 
 ### 6.2 Version and Reference Resolution
 
 1. For each project:
    - Extract version information from project file, AssemblyInfo.cs, or app.manifest
-   - Validate version format
+   - Parse version components into VersionInfo object
    - Extract project references from project file
    - Resolve referenced projects
-   - Build dependency graph
+   - Build dependency graph using linked list structure
 
-### 6.3 Build and Archive Workflow
+### 6.3 Project Selection and Operations Workflow
 
-1. Identify projects that need to be built (those without archives)
-2. Add referenced projects to the build list
-3. Sort projects by dependency order
-4. Present interactive menu with options:
-   - Build projects
+1. Discover all projects across configured repositories
+2. Present list of all projects with selection status
+3. Provide options to:
+   - Select/deselect individual projects
+   - Select/deselect all projects
+   - Select projects by pattern or criteria
+4. For selected projects, present operations menu:
    - Update NuGet packages
-   - Rebuild and archive projects
-   - Exclude a project from the build list
+   - Restore dependencies
+   - Quick build (for testing)
+   - Cleanup
+   - Rebuild
+   - Archive
    - Exit
 
 ### 6.4 Interactive Menu Options
 
-#### 6.4.1 Build
-- For each project in the build list:
-  - Execute `dotnet build` with appropriate options
-  - Display build output
-  - Handle build errors
-
-#### 6.4.2 Update NuGet Packages
-- For each project in the build list:
+#### 6.4.1 Update NuGet Packages
+- For each selected project:
   - List outdated packages
   - Update each package to the latest version
   - Display update output
   - Handle update errors
 
-#### 6.4.3 Rebuild and Archive
-- For each project in the build list:
+#### 6.4.2 Restore Dependencies
+- For each selected project:
+  - Execute `dotnet restore` with appropriate options
+  - Display restore output
+  - Handle restore errors
+
+#### 6.4.3 Quick Build
+- For each selected project:
+  - Execute `dotnet build` with appropriate options
+  - Display build output
+  - Handle build errors
+
+#### 6.4.4 Cleanup
+- For each selected project:
+  - Remove bin and obj directories
+  - Clean temporary files
+  - Display cleanup output
+  - Handle cleanup errors
+
+#### 6.4.5 Rebuild
+- For each selected project:
   - Clean the project
   - Rebuild the project for each supported runtime
+  - Display rebuild output
+  - Handle rebuild errors
+
+#### 6.4.6 Archive
+- For each selected project:
   - Archive the built binaries
   - Archive the source code
   - Display archive output
   - Handle archive errors
-
-#### 6.4.4 Exclude Project
-- Display list of projects in the build list
-- Allow user to select a project to exclude
-- Remove the selected project from the build list
 
 ## 7. Technical Requirements
 
@@ -295,6 +348,7 @@ public class ProjectInfo
 ### 7.3 Dependencies
 - System.CommandLine (for advanced command-line parsing)
 - System.Text.Json (for JSON configuration)
+- Serilog (for structured logging)
 
 ### 7.4 Performance Considerations
 - Efficient handling of large solutions with many projects
@@ -305,13 +359,7 @@ public class ProjectInfo
 
 ### 8.1 Configuration System
 
-The configuration system will use a layered approach:
-
-1. Default settings hardcoded in the application
-2. Public settings in a JSON file in the application directory
-3. Private settings in a JSON file in the user's home directory
-
-Settings will be merged with later layers taking precedence over earlier ones.
+The configuration system will use appsettings.json:
 
 ```csharp
 // Example configuration loading
@@ -319,21 +367,17 @@ public static async Task<Settings> LoadAsync()
 {
     var settings = new Settings();
 
-    // Load defaults
-    settings.ApplyDefaults();
-
-    // Load public settings
-    if (File.Exists(GetPublicSettingsPath()))
+    // Load settings from appsettings.json
+    if (File.Exists("appsettings.json"))
     {
-        var publicSettings = await LoadSettingsFileAsync(GetPublicSettingsPath());
-        settings.Merge(publicSettings);
-    }
+        var configJson = await File.ReadAllTextAsync("appsettings.json");
+        var options = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true,
+            ReadCommentHandling = JsonCommentHandling.Skip
+        };
 
-    // Load private settings
-    if (File.Exists(GetPrivateSettingsPath()))
-    {
-        var privateSettings = await LoadSettingsFileAsync(GetPrivateSettingsPath());
-        settings.Merge(privateSettings);
+        settings = JsonSerializer.Deserialize<Settings>(configJson, options) ?? new Settings();
     }
 
     return settings;
@@ -342,128 +386,200 @@ public static async Task<Settings> LoadAsync()
 
 ### 8.2 Logging System
 
-The logging system will support both console and file logging:
+The logging system will use Serilog for structured logging:
 
 ```csharp
-public static void LogInfo(string message, string indentation = "", bool flush = false)
+// Example Serilog configuration
+public static void ConfigureLogging()
 {
-    // Write to console with color
-    Console.ForegroundColor = ConsoleColor.White;
-    Console.WriteLine($"{indentation}{message}");
-    Console.ResetColor();
-
-    // Write to log file
-    File.AppendAllText(LogFilePath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} INFO: {indentation}{message}{Environment.NewLine}");
-
-    if (flush)
-        FlushLogFile();
+    Log.Logger = new LoggerConfiguration()
+        .MinimumLevel.Information()
+        .WriteTo.Console(
+            outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
+        .WriteTo.File(
+            "logs/prjbuild-.log",
+            rollingInterval: RollingInterval.Day,
+            outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {Message:lj}{NewLine}{Exception}",
+            formatter: new CompactJsonFormatter())
+        .CreateLogger();
 }
 ```
 
 ### 8.3 Project Discovery
 
-Project discovery will use a combination of directory enumeration and file pattern matching:
+Project discovery will search for projects in subdirectories:
 
 ```csharp
-public static List<SolutionInfo> DiscoverSolutions(string repositoriesPath, List<string> ignoredDirectories)
+public static List<ProjectInfo> DiscoverProjects(SolutionInfo solution)
 {
-    var solutions = new List<SolutionInfo>();
+    var projects = new List<ProjectInfo>();
+    var projectFiles = Directory.GetFiles(solution.DirectoryPath, "*.csproj", SearchOption.AllDirectories);
 
-    foreach (var directory in Directory.GetDirectories(repositoriesPath))
+    foreach (var projectFile in projectFiles)
     {
-        var dirInfo = new DirectoryInfo(directory);
+        var projectDir = Path.GetDirectoryName(projectFile);
+        var projectName = Path.GetFileNameWithoutExtension(projectFile);
 
-        if (ignoredDirectories.Contains(dirInfo.Name, StringComparer.OrdinalIgnoreCase))
+        // Skip projects in ignored directories
+        if (IsIgnoredDirectory(projectDir))
             continue;
 
-        var solutionFiles = Directory.GetFiles(directory, "*.sln");
+        // Skip obsolete projects
+        if (IsObsoleteProject(projectName))
+            continue;
 
-        if (solutionFiles.Length == 1)
-        {
-            var isObsolete = obsoleteSolutionNames.Contains(dirInfo.Name, StringComparer.OrdinalIgnoreCase);
-            solutions.Add(new SolutionInfo(solutions, archivesDirectoryPath, dirInfo.Name, directory, solutionFiles[0], isObsolete));
-        }
+        var project = new ProjectInfo(solution, projectName, projectDir, projectFile);
+        projects.Add(project);
     }
 
-    return solutions;
+    return projects;
 }
 ```
 
 ### 8.4 Version Extraction
 
-Version extraction will support multiple sources:
+Version extraction will support multiple sources and parse into components:
 
 ```csharp
-public string ExtractVersionFromCsproj(string projectFilePath)
+public VersionInfo ExtractVersion(string projectFilePath)
 {
-    var doc = XDocument.Load(projectFilePath);
-    var propertyGroup = doc.Root.Element("PropertyGroup");
+    string? csprojVersion = null;
+    string? assemblyVersion = null;
+    string? assemblyFileVersion = null;
+    string? manifestVersion = null;
 
+    // Extract from csproj
+    var doc = XDocument.Load(projectFilePath);
+    var propertyGroup = doc.Root?.Element("PropertyGroup");
     if (propertyGroup != null)
     {
         var versionElement = propertyGroup.Element("Version");
         if (versionElement != null)
-            return versionElement.Value;
+            csprojVersion = versionElement.Value;
     }
 
-    return null;
-}
+    // Extract from AssemblyInfo.cs if exists
+    var projectDir = Path.GetDirectoryName(projectFilePath);
+    var assemblyInfoPath = Path.Combine(projectDir, "Properties", "AssemblyInfo.cs");
+    if (File.Exists(assemblyInfoPath))
+    {
+        var content = File.ReadAllText(assemblyInfoPath);
 
-public string ExtractVersionFromAssemblyInfo(string assemblyInfoPath)
-{
-    var content = File.ReadAllText(assemblyInfoPath);
-    var match = Regex.Match(content, @"\[assembly:\s*AssemblyVersion\s*\(""(?<version>\d+\.\d+(\.\d+){0,2})""\)\]", RegexOptions.IgnoreCase);
+        var versionMatch = Regex.Match(content, @"\[assembly:\s*AssemblyVersion\s*\(""(?<version>\d+\.\d+(\.\d+){0,2})""\)\]");
+        if (versionMatch.Success)
+            assemblyVersion = versionMatch.Groups["version"].Value;
 
-    if (match.Success)
-        return match.Groups["version"].Value;
+        var fileVersionMatch = Regex.Match(content, @"\[assembly:\s*AssemblyFileVersion\s*\(""(?<version>\d+\.\d+(\.\d+){0,2})""\)\]");
+        if (fileVersionMatch.Success)
+            assemblyFileVersion = fileVersionMatch.Groups["version"].Value;
+    }
 
-    return null;
+    // Extract from app.manifest if exists
+    var manifestPath = Path.Combine(projectDir, "app.manifest");
+    if (File.Exists(manifestPath))
+    {
+        var content = File.ReadAllText(manifestPath);
+        var match = Regex.Match(content, @"version=""\d+\.\d+\.\d+\.\d+""");
+        if (match.Success)
+            manifestVersion = match.Value.Substring(9, match.Value.Length - 10);
+    }
+
+    return new VersionInfo(csprojVersion, assemblyVersion, assemblyFileVersion, manifestVersion);
 }
 ```
 
 ### 8.5 Dependency Resolution
 
-Dependency resolution will build a graph of project dependencies:
+Dependency resolution will use a linked list structure for better traversal:
 
 ```csharp
-public List<ProjectInfo> SortProjectsByDependency(List<ProjectInfo> projects)
+public LinkedList<ProjectInfo> ResolveProjectDependencies(List<ProjectInfo> allProjects)
 {
-    var referenceTable = projects.ToDictionary(p => p, p => GetAllReferencedProjects(p));
-    var sortedProjects = new List<ProjectInfo>();
+    var sortedProjects = new LinkedList<ProjectInfo>();
+    var visited = new HashSet<ProjectInfo>();
 
-    foreach (var project in projects)
+    foreach (var project in allProjects)
     {
-        bool isReferenced = false;
-
-        for (int i = 0; i < sortedProjects.Count; i++)
+        if (!visited.Contains(project))
         {
-            if (referenceTable[sortedProjects[i]].Contains(project))
-            {
-                sortedProjects.Insert(i, project);
-                isReferenced = true;
-                break;
-            }
+            VisitProject(project, allProjects, sortedProjects, visited, new HashSet<ProjectInfo>());
         }
-
-        if (!isReferenced)
-            sortedProjects.Add(project);
     }
 
     return sortedProjects;
+}
+
+private void VisitProject(
+    ProjectInfo project,
+    List<ProjectInfo> allProjects,
+    LinkedList<ProjectInfo> sortedProjects,
+    HashSet<ProjectInfo> visited,
+    HashSet<ProjectInfo> visiting)
+{
+    visiting.Add(project);
+
+    foreach (var reference in project.ReferencedProjects)
+    {
+        if (visiting.Contains(reference))
+        {
+            // Circular reference detected
+            throw new InvalidOperationException($"Circular reference detected: {project.Name} -> {reference.Name}");
+        }
+
+        if (!visited.Contains(reference))
+        {
+            VisitProject(reference, allProjects, sortedProjects, visited, visiting);
+        }
+    }
+
+    visiting.Remove(project);
+    visited.Add(project);
+    sortedProjects.AddLast(project);
 }
 ```
 
 ### 8.6 Build Operations
 
-Build operations will use the .NET CLI:
+Build and restore operations will be separate:
 
 ```csharp
-public List<string> Build(bool noRestore)
+public List<string> Build()
 {
     var arguments = new List<string> { "build", FilePath, "--configuration", "Release" };
 
-    if (noRestore)
-        arguments.Add("--no-restore");
+    var process = new Process
+    {
+        StartInfo = new ProcessStartInfo
+        {
+            FileName = "dotnet",
+            Arguments = string.Join(" ", arguments),
+            WorkingDirectory = DirectoryPath,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        }
+    };
+
+    process.Start();
+    var output = process.StandardOutput.ReadToEnd();
+    var error = process.StandardError.ReadToEnd();
+    process.WaitForExit();
+
+    var messages = new List<string>();
+
+    if (!string.IsNullOrEmpty(output))
+        messages.AddRange(output.Split(Environment.NewLine));
+
+    if (!string.IsNullOrEmpty(error))
+        messages.AddRange(error.Split(Environment.NewLine));
+
+    return messages;
+}
+
+public List<string> Restore()
+{
+    var arguments = new List<string> { "restore", FilePath };
 
     var process = new Process
     {
@@ -501,46 +617,29 @@ public List<string> Build(bool noRestore)
 Archive operations will create ZIP files:
 
 ```csharp
-public List<string> ArchiveSolution(List<string> notArchivedDirectoryNames, List<string> notArchivedFileNames)
+public List<string> Archive(List<string> notArchivedDirectoryNames, List<string> notArchivedFileNames)
 {
     var messages = new List<string>();
-    var archiveDirectory = Path.GetDirectoryName(SourceArchiveFilePath);
+    var archiveDirectory = Path.GetDirectoryName(SourceArchivePath);
 
     Directory.CreateDirectory(archiveDirectory);
 
-    using (var archive = ZipFile.Open(SourceArchiveFilePath, ZipArchiveMode.Create))
+    using (var archive = ZipFile.Open(SourceArchivePath, ZipArchiveMode.Create))
     {
         var fileCount = AddDirectoryToArchive(archive, DirectoryPath, "", notArchivedDirectoryNames, notArchivedFileNames);
 
         if (fileCount > 0)
-            messages.Add($"Archive file created: {SourceArchiveFilePath}");
+            messages.Add($"Archive file created: {SourceArchivePath}");
         else
         {
-            File.Delete(SourceArchiveFilePath);
-            messages.Add($"Empty archive file deleted: {SourceArchiveFilePath}");
+            File.Delete(SourceArchivePath);
+            messages.Add($"Empty archive file deleted: {SourceArchivePath}");
         }
     }
 
     return messages;
 }
 ```
-
-## 9. Future Enhancements
-
-### 9.1 Version 0.2
-- Add support for non-interactive mode (command-line arguments)
-- Implement parallel building for independent projects
-- Add support for custom build configurations
-
-### 9.2 Version 0.3
-- Add support for MSBuild projects (.vcxproj, etc.)
-- Implement build caching for faster rebuilds
-- Add support for custom build steps
-
-### 9.3 Version 1.0
-- Add a simple web interface for remote build monitoring
-- Implement CI/CD integration
-- Add support for cross-platform builds
 
 ## 10. Conclusion
 
