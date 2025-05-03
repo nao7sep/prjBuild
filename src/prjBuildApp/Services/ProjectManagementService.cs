@@ -76,10 +76,8 @@ namespace prjBuildApp.Services
 
         private void DiscoverProjects(SolutionInfo solution)
         {
-            // Find all project files in the solution directory and subdirectories
-            var projectFiles = _fileSystemService.EnumerateFiles(solution.DirectoryPath, "*.csproj", true)
-                .Concat(_fileSystemService.EnumerateFiles(solution.DirectoryPath, "*.vbproj", true))
-                .Concat(_fileSystemService.EnumerateFiles(solution.DirectoryPath, "*.fsproj", true));
+            // Find all C# project files in the solution directory and subdirectories
+            var projectFiles = _fileSystemService.EnumerateFiles(solution.DirectoryPath, "*.csproj", true);
 
             foreach (var projectFile in projectFiles)
             {

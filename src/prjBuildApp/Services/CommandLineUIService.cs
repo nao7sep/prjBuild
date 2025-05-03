@@ -34,7 +34,7 @@ namespace prjBuildApp.Services
 
             if (_projectManagementService.Solutions.Count == 0)
             {
-                Console.WriteLine("No solutions found. Please check your configuration.");
+                _loggingService.Warning("No solutions found. Please check your configuration.");
                 return;
             }
 
@@ -70,7 +70,7 @@ namespace prjBuildApp.Services
                         }
                         else
                         {
-                            Console.WriteLine("No projects selected. Please select at least one project.");
+                            _loggingService.Information("No projects selected. Please select at least one project.");
                         }
                         break;
                     case "6":
@@ -83,7 +83,7 @@ namespace prjBuildApp.Services
                         exit = true;
                         break;
                     default:
-                        Console.WriteLine("Invalid choice. Please try again.");
+                        _loggingService.Information("Invalid choice. Please try again.");
                         break;
                 }
             }
@@ -94,7 +94,7 @@ namespace prjBuildApp.Services
         private void DisplayProjectSelectionMenu()
         {
             Console.Clear();
-            Console.WriteLine("=== prjBuild Project Selection ===");
+            _loggingService.Information("=== prjBuild Project Selection ===");
             Console.WriteLine();
 
             // Display all projects with selection status
@@ -105,23 +105,24 @@ namespace prjBuildApp.Services
                 .ThenBy(p => p.Name)
                 .ToList();
 
-            Console.WriteLine("Projects:");
+            _loggingService.Information("Projects:");
             for (int i = 0; i < allProjects.Count; i++)
             {
                 var project = allProjects[i];
                 string selectionStatus = _selectedProjects.Contains(project) ? "[X]" : "[ ]";
-                Console.WriteLine($"{i + 1}. {selectionStatus} {project.Solution.Name} - {project.Name}");
+                _loggingService.Information("{Index}. {Status} {SolutionName}/{ProjectName}",
+                    i + 1, selectionStatus, project.Solution.Name, project.Name);
             }
 
             Console.WriteLine();
-            Console.WriteLine("Options:");
-            Console.WriteLine("1. Select project");
-            Console.WriteLine("2. Deselect project");
-            Console.WriteLine("3. Select all projects");
-            Console.WriteLine("4. Deselect all projects");
-            Console.WriteLine("5. Operations menu");
-            Console.WriteLine($"6. {(_showObsoleteItems ? "Hide" : "Show")} obsolete items");
-            Console.WriteLine("7. Exit");
+            _loggingService.Information("Options:");
+            _loggingService.Information("1. Select project");
+            _loggingService.Information("2. Deselect project");
+            _loggingService.Information("3. Select all projects");
+            _loggingService.Information("4. Deselect all projects");
+            _loggingService.Information("5. Operations menu");
+            _loggingService.Information("6. {Action} obsolete items", _showObsoleteItems ? "Hide" : "Show");
+            _loggingService.Information("7. Exit");
             Console.WriteLine();
         }
 
@@ -141,16 +142,16 @@ namespace prjBuildApp.Services
                 if (!_selectedProjects.Contains(project))
                 {
                     _selectedProjects.Add(project);
-                    Console.WriteLine($"Selected project: {project.Solution.Name} - {project.Name}");
+                    _loggingService.Information("Selected project: {SolutionName}/{ProjectName}", project.Solution.Name, project.Name);
                 }
                 else
                 {
-                    Console.WriteLine($"Project already selected: {project.Solution.Name} - {project.Name}");
+                    _loggingService.Information("Project already selected: {SolutionName}/{ProjectName}", project.Solution.Name, project.Name);
                 }
             }
             else
             {
-                Console.WriteLine("Invalid project number.");
+                _loggingService.Warning("Invalid project number entered");
             }
 
             Console.WriteLine("Press any key to continue...");
@@ -161,17 +162,18 @@ namespace prjBuildApp.Services
         {
             if (_selectedProjects.Count == 0)
             {
-                Console.WriteLine("No projects selected.");
+                _loggingService.Information("No projects selected for deselection");
                 Console.WriteLine("Press any key to continue...");
                 Console.ReadKey();
                 return;
             }
 
-            Console.WriteLine("Selected projects:");
+            _loggingService.Information("Selected projects for deselection:");
             for (int i = 0; i < _selectedProjects.Count; i++)
             {
                 var project = _selectedProjects[i];
-                Console.WriteLine($"{i + 1}. {project.Solution.Name} - {project.Name}");
+                _loggingService.Information("{Index}. {SolutionName}/{ProjectName}",
+                    i + 1, project.Solution.Name, project.Name);
             }
 
             Console.Write("Enter project number to deselect: ");
@@ -179,11 +181,11 @@ namespace prjBuildApp.Services
             {
                 var project = _selectedProjects[projectNumber - 1];
                 _selectedProjects.Remove(project);
-                Console.WriteLine($"Deselected project: {project.Solution.Name} - {project.Name}");
+                _loggingService.Information("Deselected project: {SolutionName}/{ProjectName}", project.Solution.Name, project.Name);
             }
             else
             {
-                Console.WriteLine("Invalid project number.");
+                _loggingService.Warning("Invalid project number entered for deselection");
             }
 
             Console.WriteLine("Press any key to continue...");
@@ -202,7 +204,7 @@ namespace prjBuildApp.Services
                 }
             }
 
-            Console.WriteLine($"Selected all {_selectedProjects.Count} projects.");
+            _loggingService.Information("Selected all {Count} projects", _selectedProjects.Count);
             Console.WriteLine("Press any key to continue...");
             Console.ReadKey();
         }
@@ -212,7 +214,7 @@ namespace prjBuildApp.Services
             int count = _selectedProjects.Count;
             _selectedProjects.Clear();
 
-            Console.WriteLine($"Deselected all {count} projects.");
+            _loggingService.Information("Deselected all {Count} projects", count);
             Console.WriteLine("Press any key to continue...");
             Console.ReadKey();
         }
@@ -220,7 +222,7 @@ namespace prjBuildApp.Services
         private void ToggleObsoleteItemsDisplay()
         {
             _showObsoleteItems = !_showObsoleteItems;
-            Console.WriteLine($"{(_showObsoleteItems ? "Showing" : "Hiding")} obsolete items.");
+            _loggingService.Information("{Action} obsolete items", _showObsoleteItems ? "Showing" : "Hiding");
             Console.WriteLine("Press any key to continue...");
             Console.ReadKey();
         }
@@ -231,24 +233,24 @@ namespace prjBuildApp.Services
             while (!back)
             {
                 Console.Clear();
-                Console.WriteLine("=== prjBuild Operations ===");
+                _loggingService.Information("=== prjBuild Operations ===");
                 Console.WriteLine();
 
-                Console.WriteLine($"Selected projects: {_selectedProjects.Count}");
+                _loggingService.Information("Selected projects: {Count}", _selectedProjects.Count);
                 foreach (var project in _selectedProjects)
                 {
-                    Console.WriteLine($"- {project.Solution.Name} - {project.Name}");
+                    _loggingService.Information("- {SolutionName}/{ProjectName}", project.Solution.Name, project.Name);
                 }
 
                 Console.WriteLine();
-                Console.WriteLine("Operations:");
-                Console.WriteLine("1. Update NuGet packages");
-                Console.WriteLine("2. Restore dependencies");
-                Console.WriteLine("3. Quick build");
-                Console.WriteLine("4. Cleanup");
-                Console.WriteLine("5. Rebuild");
-                Console.WriteLine("6. Archive");
-                Console.WriteLine("7. Back to project selection");
+                _loggingService.Information("Operations:");
+                _loggingService.Information("1. Update NuGet packages");
+                _loggingService.Information("2. Restore dependencies");
+                _loggingService.Information("3. Quick build");
+                _loggingService.Information("4. Cleanup");
+                _loggingService.Information("5. Rebuild");
+                _loggingService.Information("6. Archive");
+                _loggingService.Information("7. Back to project selection");
                 Console.WriteLine();
 
                 Console.Write("Enter your choice: ");
@@ -280,7 +282,7 @@ namespace prjBuildApp.Services
                         back = true;
                         break;
                     default:
-                        Console.WriteLine("Invalid choice. Please try again.");
+                        _loggingService.Warning("Invalid operation choice entered");
                         Console.WriteLine("Press any key to continue...");
                         Console.ReadKey();
                         break;
@@ -291,23 +293,24 @@ namespace prjBuildApp.Services
         private void UpdateNuGetPackages()
         {
             Console.Clear();
-            Console.WriteLine("=== Update NuGet Packages ===");
+            _loggingService.Information("=== Update NuGet Packages ===");
             Console.WriteLine();
 
             foreach (var project in _selectedProjects)
             {
-                Console.WriteLine($"Updating NuGet packages for {project.Solution.Name} - {project.Name}...");
+                _loggingService.Information("Updating NuGet packages for {SolutionName} - {ProjectName}...",
+                    project.Solution.Name, project.Name);
                 var output = _buildService.UpdateNuGetPackages(project);
 
                 foreach (var line in output)
                 {
-                    Console.WriteLine($"  {line}");
+                    _loggingService.Debug("NuGet update output: {Line}", line);
                 }
 
                 Console.WriteLine();
             }
 
-            Console.WriteLine("NuGet package update completed.");
+            _loggingService.Information("NuGet package update completed");
             Console.WriteLine("Press any key to continue...");
             Console.ReadKey();
         }
@@ -315,23 +318,24 @@ namespace prjBuildApp.Services
         private void RestoreDependencies()
         {
             Console.Clear();
-            Console.WriteLine("=== Restore Dependencies ===");
+            _loggingService.Information("=== Restore Dependencies ===");
             Console.WriteLine();
 
             foreach (var project in _selectedProjects)
             {
-                Console.WriteLine($"Restoring dependencies for {project.Solution.Name} - {project.Name}...");
+                _loggingService.Information("Restoring dependencies for {SolutionName} - {ProjectName}...",
+                    project.Solution.Name, project.Name);
                 var output = _buildService.RestoreProject(project);
 
                 foreach (var line in output)
                 {
-                    Console.WriteLine($"  {line}");
+                    _loggingService.Debug("Restore output: {Line}", line);
                 }
 
                 Console.WriteLine();
             }
 
-            Console.WriteLine("Dependency restoration completed.");
+            _loggingService.Information("Dependency restoration completed");
             Console.WriteLine("Press any key to continue...");
             Console.ReadKey();
         }
@@ -339,23 +343,24 @@ namespace prjBuildApp.Services
         private void QuickBuild()
         {
             Console.Clear();
-            Console.WriteLine("=== Quick Build ===");
+            _loggingService.Information("=== Quick Build ===");
             Console.WriteLine();
 
             foreach (var project in _selectedProjects)
             {
-                Console.WriteLine($"Building {project.Solution.Name} - {project.Name}...");
+                _loggingService.Information("Building {SolutionName} - {ProjectName}...",
+                    project.Solution.Name, project.Name);
                 var output = _buildService.BuildProject(project);
 
                 foreach (var line in output)
                 {
-                    Console.WriteLine($"  {line}");
+                    _loggingService.Debug("Build output: {Line}", line);
                 }
 
                 Console.WriteLine();
             }
 
-            Console.WriteLine("Build completed.");
+            _loggingService.Information("Build completed");
             Console.WriteLine("Press any key to continue...");
             Console.ReadKey();
         }
@@ -363,23 +368,24 @@ namespace prjBuildApp.Services
         private void Cleanup()
         {
             Console.Clear();
-            Console.WriteLine("=== Cleanup ===");
+            _loggingService.Information("=== Cleanup ===");
             Console.WriteLine();
 
             foreach (var project in _selectedProjects)
             {
-                Console.WriteLine($"Cleaning up {project.Solution.Name} - {project.Name}...");
+                _loggingService.Information("Cleaning up {SolutionName} - {ProjectName}...",
+                    project.Solution.Name, project.Name);
                 var output = _buildService.CleanupProject(project);
 
                 foreach (var line in output)
                 {
-                    Console.WriteLine($"  {line}");
+                    _loggingService.Debug("Cleanup output: {Line}", line);
                 }
 
                 Console.WriteLine();
             }
 
-            Console.WriteLine("Cleanup completed.");
+            _loggingService.Information("Cleanup completed");
             Console.WriteLine("Press any key to continue...");
             Console.ReadKey();
         }
@@ -387,31 +393,32 @@ namespace prjBuildApp.Services
         private void Rebuild()
         {
             Console.Clear();
-            Console.WriteLine("=== Rebuild ===");
+            _loggingService.Information("=== Rebuild ===");
             Console.WriteLine();
 
             foreach (var project in _selectedProjects)
             {
-                Console.WriteLine($"Rebuilding {project.Solution.Name} - {project.Name}...");
+                _loggingService.Information("Rebuilding {SolutionName} - {ProjectName}...",
+                    project.Solution.Name, project.Name);
 
                 // Clean the project first
                 var cleanOutput = _buildService.CleanupProject(project);
                 foreach (var line in cleanOutput)
                 {
-                    Console.WriteLine($"  {line}");
+                    _loggingService.Debug("Rebuild clean output: {Line}", line);
                 }
 
                 // Then build it
                 var buildOutput = _buildService.BuildProject(project);
                 foreach (var line in buildOutput)
                 {
-                    Console.WriteLine($"  {line}");
+                    _loggingService.Debug("Rebuild build output: {Line}", line);
                 }
 
                 Console.WriteLine();
             }
 
-            Console.WriteLine("Rebuild completed.");
+            _loggingService.Information("Rebuild completed");
             Console.WriteLine("Press any key to continue...");
             Console.ReadKey();
         }
@@ -419,12 +426,13 @@ namespace prjBuildApp.Services
         private void Archive()
         {
             Console.Clear();
-            Console.WriteLine("=== Archive ===");
+            _loggingService.Information("=== Archive ===");
             Console.WriteLine();
 
             foreach (var project in _selectedProjects)
             {
-                Console.WriteLine($"Archiving {project.Solution.Name} - {project.Name}...");
+                _loggingService.Information("Archiving {SolutionName} - {ProjectName}...",
+                    project.Solution.Name, project.Name);
 
                 // Get the parent root directory for the solution
                 var solution = project.Solution;
@@ -435,7 +443,7 @@ namespace prjBuildApp.Services
 
                 if (string.IsNullOrEmpty(rootDir))
                 {
-                    Console.WriteLine("  Error: Could not determine root directory for archiving.");
+                    _loggingService.Error(null, "Could not determine root directory for archiving project {ProjectName}", project.Name);
                     continue;
                 }
 
@@ -447,13 +455,13 @@ namespace prjBuildApp.Services
                 var output = _buildService.ArchiveProject(project, archiveDirectory, supportedRuntimes);
                 foreach (var line in output)
                 {
-                    Console.WriteLine($"  {line}");
+                    _loggingService.Debug("Archive output: {Line}", line);
                 }
 
                 Console.WriteLine();
             }
 
-            Console.WriteLine("Archive completed.");
+            _loggingService.Information("Archive completed");
             Console.WriteLine("Press any key to continue...");
             Console.ReadKey();
         }

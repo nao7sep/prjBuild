@@ -19,24 +19,34 @@ namespace prjBuildApp.Services
                 string logsDirectory = Path.Combine(Directory.GetCurrentDirectory(), "logs");
                 Directory.CreateDirectory(logsDirectory);
 
-                // Configure Serilog
+                // Configure Serilog using only the configuration from appsettings.json
                 _logger = new LoggerConfiguration()
                     .ReadFrom.Configuration(configuration)
+                    .CreateLogger();
+
+                // Set as static logger for global usage
+                Log.Logger = _logger;
+
+                _logger.Information("Logging initialized");
+            }
+            catch (Exception ex)
+            {
+                // Create logs directory for fallback logger if it doesn't exist
+                string logsDirectory = Path.Combine(Directory.GetCurrentDirectory(), "logs");
+                Directory.CreateDirectory(logsDirectory);
+
+                // Fallback logger that matches configuration structure but with Debug level
+                _logger = new LoggerConfiguration()
+                    .MinimumLevel.Debug()
+                    .Enrich.FromLogContext()
                     .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
                     .WriteTo.File(
                         Path.Combine(logsDirectory, $"prjBuild-{DateTime.Now:yyyyMMdd-HHmmss}.log"),
                         outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
                     .CreateLogger();
 
-                _logger.Information("Logging initialized");
-            }
-            catch (Exception ex)
-            {
-                // Fallback logger in case configuration fails
-                _logger = new LoggerConfiguration()
-                    .MinimumLevel.Debug()
-                    .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
-                    .CreateLogger();
+                // Set as static logger for global usage
+                Log.Logger = _logger;
 
                 _logger.Error(ex, "Failed to initialize logging from configuration");
             }
