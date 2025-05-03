@@ -18,79 +18,6 @@ namespace prjBuildApp.Services
             _fileSystemService = fileSystemService;
         }
 
-        public List<string> BuildProject(ProjectInfo project, string? runtime = null, bool noRestore = false)
-        {
-            var output = new List<string>();
-
-            try
-            {
-                _loggingService.Information("Building project {ProjectName}", project.Name);
-
-                var arguments = new List<string> { "build", project.FilePath, "--configuration", "Release" };
-
-                if (!string.IsNullOrEmpty(runtime))
-                {
-                    arguments.Add("--runtime");
-                    arguments.Add(runtime);
-                    arguments.Add("--self-contained");
-                }
-
-                if (noRestore)
-                {
-                    arguments.Add("--no-restore");
-                }
-
-                var result = RunDotNetCommand(arguments, project.DirectoryPath);
-                output.AddRange(result);
-
-                if (result.Any(line => line.Contains("Build succeeded")))
-                {
-                    _loggingService.Information("Successfully built project {ProjectName}", project.Name);
-                }
-                else
-                {
-                    _loggingService.Warning("Build may have failed for project {ProjectName}", project.Name);
-                }
-            }
-            catch (Exception ex)
-            {
-                _loggingService.Error(ex, "Error building project {ProjectName}", project.Name);
-                output.Add($"Error: {ex.Message}");
-            }
-
-            return output;
-        }
-
-        public List<string> RestoreProject(ProjectInfo project)
-        {
-            var output = new List<string>();
-
-            try
-            {
-                _loggingService.Information("Restoring dependencies for project {ProjectName}", project.Name);
-
-                var arguments = new List<string> { "restore", project.FilePath };
-                var result = RunDotNetCommand(arguments, project.DirectoryPath);
-                output.AddRange(result);
-
-                if (result.Any(line => line.Contains("Restore completed")))
-                {
-                    _loggingService.Information("Successfully restored dependencies for project {ProjectName}", project.Name);
-                }
-                else
-                {
-                    _loggingService.Warning("Restore may have failed for project {ProjectName}", project.Name);
-                }
-            }
-            catch (Exception ex)
-            {
-                _loggingService.Error(ex, "Error restoring dependencies for project {ProjectName}", project.Name);
-                output.Add($"Error: {ex.Message}");
-            }
-
-            return output;
-        }
-
         public List<string> UpdateNuGetPackages(ProjectInfo project)
         {
             var output = new List<string>();
@@ -130,6 +57,79 @@ namespace prjBuildApp.Services
             catch (Exception ex)
             {
                 _loggingService.Error(ex, "Error updating NuGet packages for project {ProjectName}", project.Name);
+                output.Add($"Error: {ex.Message}");
+            }
+
+            return output;
+        }
+
+        public List<string> RestoreProject(ProjectInfo project)
+        {
+            var output = new List<string>();
+
+            try
+            {
+                _loggingService.Information("Restoring dependencies for project {ProjectName}", project.Name);
+
+                var arguments = new List<string> { "restore", project.FilePath };
+                var result = RunDotNetCommand(arguments, project.DirectoryPath);
+                output.AddRange(result);
+
+                if (result.Any(line => line.Contains("Restore completed")))
+                {
+                    _loggingService.Information("Successfully restored dependencies for project {ProjectName}", project.Name);
+                }
+                else
+                {
+                    _loggingService.Warning("Restore may have failed for project {ProjectName}", project.Name);
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.Error(ex, "Error restoring dependencies for project {ProjectName}", project.Name);
+                output.Add($"Error: {ex.Message}");
+            }
+
+            return output;
+        }
+
+        public List<string> BuildProject(ProjectInfo project, string? runtime = null, bool noRestore = false)
+        {
+            var output = new List<string>();
+
+            try
+            {
+                _loggingService.Information("Building project {ProjectName}", project.Name);
+
+                var arguments = new List<string> { "build", project.FilePath, "--configuration", "Release" };
+
+                if (!string.IsNullOrEmpty(runtime))
+                {
+                    arguments.Add("--runtime");
+                    arguments.Add(runtime);
+                    arguments.Add("--self-contained");
+                }
+
+                if (noRestore)
+                {
+                    arguments.Add("--no-restore");
+                }
+
+                var result = RunDotNetCommand(arguments, project.DirectoryPath);
+                output.AddRange(result);
+
+                if (result.Any(line => line.Contains("Build succeeded")))
+                {
+                    _loggingService.Information("Successfully built project {ProjectName}", project.Name);
+                }
+                else
+                {
+                    _loggingService.Warning("Build may have failed for project {ProjectName}", project.Name);
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.Error(ex, "Error building project {ProjectName}", project.Name);
                 output.Add($"Error: {ex.Message}");
             }
 
@@ -199,8 +199,8 @@ namespace prjBuildApp.Services
                 // Archive binaries for each supported runtime
                 foreach (var runtime in supportedRuntimes)
                 {
-                    // Build the project for this runtime
-                    var buildOutput = BuildProject(project, runtime);
+                    // Build the project for this runtime with noRestore=true for efficiency
+                    var buildOutput = BuildProject(project, runtime, true);
                     output.AddRange(buildOutput);
 
                     // Create binary archive
