@@ -242,13 +242,10 @@ namespace prjBuildApp.Services
 
                 Console.WriteLine();
                 Console.WriteLine("Operations:");
-                Console.WriteLine("1. Update NuGet packages");
-                Console.WriteLine("2. Restore dependencies");
-                Console.WriteLine("3. Quick build");
-                Console.WriteLine("4. Cleanup");
-                Console.WriteLine("5. Rebuild");
-                Console.WriteLine("6. Archive");
-                Console.WriteLine("7. Back to project selection");
+                Console.WriteLine("1. Update NuGet packages - Check for and update all NuGet dependencies");
+                Console.WriteLine("2. Build - Restore dependencies and compile the project");
+                Console.WriteLine("3. Create Release - Clean, publish binaries, and archive source and binaries");
+                Console.WriteLine("4. Back to project selection");
                 Console.WriteLine();
 
                 Console.Write("Enter your choice: ");
@@ -260,21 +257,12 @@ namespace prjBuildApp.Services
                         UpdateNuGetPackages();
                         break;
                     case "2":
-                        RestoreDependencies();
+                        Build();
                         break;
                     case "3":
-                        QuickBuild();
+                        CreateRelease();
                         break;
                     case "4":
-                        Cleanup();
-                        break;
-                    case "5":
-                        Rebuild();
-                        break;
-                    case "6":
-                        Archive();
-                        break;
-                    case "7":
                     case "b":
                     case "back":
                         back = true;
@@ -313,32 +301,7 @@ namespace prjBuildApp.Services
             Console.ReadKey();
         }
 
-        private void RestoreDependencies()
-        {
-            Console.Clear();
-            Console.WriteLine("=== Restore Dependencies ===");
-            Console.WriteLine();
-
-            foreach (var project in _selectedProjects)
-            {
-                _loggingService.Information("Restoring dependencies for {SolutionName} - {ProjectName}...",
-                    project.Solution.Name, project.Name);
-                var output = _buildService.RestoreProject(project);
-
-                foreach (var line in output)
-                {
-                    _loggingService.Debug("Restore output: {Line}", line);
-                }
-
-                Console.WriteLine();
-            }
-
-            _loggingService.Information("Dependency restoration completed");
-            Console.WriteLine("Press any key to continue...");
-            Console.ReadKey();
-        }
-
-        private void QuickBuild()
+        private void Build()
         {
             Console.Clear();
             Console.WriteLine("=== Quick Build ===");
@@ -363,73 +326,16 @@ namespace prjBuildApp.Services
             Console.ReadKey();
         }
 
-        private void Cleanup()
+        private void CreateRelease()
         {
             Console.Clear();
-            Console.WriteLine("=== Cleanup ===");
+            Console.WriteLine("=== Create Release ===");
+            Console.WriteLine("This will clean the project, publish binaries, and create archives");
             Console.WriteLine();
 
             foreach (var project in _selectedProjects)
             {
-                _loggingService.Information("Cleaning up {SolutionName} - {ProjectName}...",
-                    project.Solution.Name, project.Name);
-                var output = _buildService.CleanupProject(project);
-
-                foreach (var line in output)
-                {
-                    _loggingService.Debug("Cleanup output: {Line}", line);
-                }
-
-                Console.WriteLine();
-            }
-
-            _loggingService.Information("Cleanup completed");
-            Console.WriteLine("Press any key to continue...");
-            Console.ReadKey();
-        }
-
-        private void Rebuild()
-        {
-            Console.Clear();
-            Console.WriteLine("=== Rebuild ===");
-            Console.WriteLine();
-
-            foreach (var project in _selectedProjects)
-            {
-                _loggingService.Information("Rebuilding {SolutionName} - {ProjectName}...",
-                    project.Solution.Name, project.Name);
-
-                // Clean the project first
-                var cleanOutput = _buildService.CleanupProject(project);
-                foreach (var line in cleanOutput)
-                {
-                    _loggingService.Debug("Rebuild clean output: {Line}", line);
-                }
-
-                // Then build it
-                var buildOutput = _buildService.BuildProject(project);
-                foreach (var line in buildOutput)
-                {
-                    _loggingService.Debug("Rebuild build output: {Line}", line);
-                }
-
-                Console.WriteLine();
-            }
-
-            _loggingService.Information("Rebuild completed");
-            Console.WriteLine("Press any key to continue...");
-            Console.ReadKey();
-        }
-
-        private void Archive()
-        {
-            Console.Clear();
-            Console.WriteLine("=== Archive ===");
-            Console.WriteLine();
-
-            foreach (var project in _selectedProjects)
-            {
-                _loggingService.Information("Archiving {SolutionName} - {ProjectName}...",
+                _loggingService.Information("Creating release for {SolutionName} - {ProjectName}...",
                     project.Solution.Name, project.Name);
 
                 // Get the parent root directory for the solution
@@ -441,17 +347,37 @@ namespace prjBuildApp.Services
 
                 if (string.IsNullOrEmpty(rootDir))
                 {
-                    _loggingService.Error(null, "Could not determine root directory for archiving project {ProjectName}", project.Name);
+                    _loggingService.Error(null, "Could not determine root directory for project {ProjectName}", project.Name);
                     continue;
                 }
 
-                string archiveDirectory = Path.Combine(rootDir, "archives");
+                // First clean the project
+                _loggingService.Information("Cleaning project {ProjectName}...", project.Name);
+                var cleanOutput = _buildService.CleanupProject(project, true, true);
+                foreach (var line in cleanOutput)
+                {
+                    _loggingService.Debug("Clean output: {Line}", line);
+                }
+
+                // Then publish the project
+                string publishDirectory = Path.Combine(rootDir, "publish", project.Name);
 
                 // For simplicity, we'll just use a default runtime
                 var supportedRuntimes = new List<string> { "win-x64" };
 
-                var output = _buildService.ArchiveProject(project, archiveDirectory, supportedRuntimes);
-                foreach (var line in output)
+                foreach (var runtime in supportedRuntimes)
+                {
+                    var publishOutput = _buildService.PublishProject(project, publishDirectory, runtime);
+                    foreach (var line in publishOutput)
+                    {
+                        _loggingService.Debug("Publish output: {Line}", line);
+                    }
+                }
+
+                // Then archive the project
+                string archiveDirectory = Path.Combine(rootDir, "archives");
+                var archiveOutput = _buildService.ArchiveProject(project, archiveDirectory, supportedRuntimes);
+                foreach (var line in archiveOutput)
                 {
                     _loggingService.Debug("Archive output: {Line}", line);
                 }
@@ -459,7 +385,7 @@ namespace prjBuildApp.Services
                 Console.WriteLine();
             }
 
-            _loggingService.Information("Archive completed");
+            _loggingService.Information("Release creation completed");
             Console.WriteLine("Press any key to continue...");
             Console.ReadKey();
         }

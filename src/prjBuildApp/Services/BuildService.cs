@@ -136,6 +136,57 @@ namespace prjBuildApp.Services
             return output;
         }
 
+        public List<string> PublishProject(ProjectInfo project, string outputDirectory, string? runtime = null)
+        {
+            var output = new List<string>();
+
+            try
+            {
+                _loggingService.Information("Publishing project {ProjectName}", project.Name);
+
+                // Create output directory if it doesn't exist
+                if (!Directory.Exists(outputDirectory))
+                {
+                    Directory.CreateDirectory(outputDirectory);
+                    output.Add($"Created directory: {outputDirectory}");
+                }
+
+                var arguments = new List<string> {
+                    "publish",
+                    project.FilePath,
+                    "--configuration", "Release",
+                    "--output", outputDirectory
+                };
+
+                if (!string.IsNullOrEmpty(runtime))
+                {
+                    arguments.Add("--runtime");
+                    arguments.Add(runtime);
+                    arguments.Add("--self-contained");
+                }
+
+                var result = RunDotNetCommand(arguments, project.DirectoryPath);
+                output.AddRange(result);
+
+                if (result.Any(line => line.Contains("Published")))
+                {
+                    _loggingService.Information("Successfully published project {ProjectName} to {OutputDirectory}",
+                        project.Name, outputDirectory);
+                }
+                else
+                {
+                    _loggingService.Warning("Publish may have failed for project {ProjectName}", project.Name);
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.Error(ex, "Error publishing project {ProjectName}", project.Name);
+                output.Add($"Error: {ex.Message}");
+            }
+
+            return output;
+        }
+
         public List<string> CleanupProject(ProjectInfo project, bool deleteBinDirectory = false, bool deleteObjDirectory = true)
         {
             var output = new List<string>();
