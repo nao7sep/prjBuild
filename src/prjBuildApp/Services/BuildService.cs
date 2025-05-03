@@ -18,7 +18,7 @@ namespace prjBuildApp.Services
             _fileSystemService = fileSystemService;
         }
 
-        public List<string> BuildProject(ProjectInfo project, string? runtime = null)
+        public List<string> BuildProject(ProjectInfo project, string? runtime = null, bool noRestore = false)
         {
             var output = new List<string>();
 
@@ -33,6 +33,11 @@ namespace prjBuildApp.Services
                     arguments.Add("--runtime");
                     arguments.Add(runtime);
                     arguments.Add("--self-contained");
+                }
+
+                if (noRestore)
+                {
+                    arguments.Add("--no-restore");
                 }
 
                 var result = RunDotNetCommand(arguments, project.DirectoryPath);
@@ -131,7 +136,7 @@ namespace prjBuildApp.Services
             return output;
         }
 
-        public List<string> CleanupProject(ProjectInfo project)
+        public List<string> CleanupProject(ProjectInfo project, bool deleteBinDirectory = false, bool deleteObjDirectory = true)
         {
             var output = new List<string>();
 
@@ -144,22 +149,28 @@ namespace prjBuildApp.Services
                 var cleanResult = RunDotNetCommand(cleanArguments, project.DirectoryPath);
                 output.AddRange(cleanResult);
 
-                // Delete bin and obj directories
-                string binDir = Path.Combine(project.DirectoryPath, "bin");
-                string objDir = Path.Combine(project.DirectoryPath, "obj");
-
-                if (Directory.Exists(binDir))
+                // Delete bin directory if specified
+                if (deleteBinDirectory)
                 {
-                    Directory.Delete(binDir, true);
-                    output.Add($"Deleted directory: {binDir}");
-                    _loggingService.Information("Deleted bin directory for project {ProjectName}", project.Name);
+                    string binDir = Path.Combine(project.DirectoryPath, "bin");
+                    if (Directory.Exists(binDir))
+                    {
+                        Directory.Delete(binDir, true);
+                        output.Add($"Deleted directory: {binDir}");
+                        _loggingService.Information("Deleted bin directory for project {ProjectName}", project.Name);
+                    }
                 }
 
-                if (Directory.Exists(objDir))
+                // Delete obj directory if specified
+                if (deleteObjDirectory)
                 {
-                    Directory.Delete(objDir, true);
-                    output.Add($"Deleted directory: {objDir}");
-                    _loggingService.Information("Deleted obj directory for project {ProjectName}", project.Name);
+                    string objDir = Path.Combine(project.DirectoryPath, "obj");
+                    if (Directory.Exists(objDir))
+                    {
+                        Directory.Delete(objDir, true);
+                        output.Add($"Deleted directory: {objDir}");
+                        _loggingService.Information("Deleted obj directory for project {ProjectName}", project.Name);
+                    }
                 }
             }
             catch (Exception ex)
