@@ -208,7 +208,6 @@ public class RootDirectoryConfig
 public class SolutionConfig
 {
     public string Name { get; set; }
-    public bool IsObsolete { get; set; }
     public RootDirectoryConfig ParentRootDirectory { get; set; }
     public List<ProjectConfig> Projects { get; set; }
 
@@ -221,7 +220,6 @@ public class ProjectConfig
 {
     // Core configuration
     public string Name { get; set; }
-    public bool IsObsolete { get; set; }
     public List<string> SupportedRuntimes { get; set; }
 
     // Project-specific ignore patterns
@@ -235,7 +233,6 @@ public class ProjectConfig
 ```csharp
 public abstract class InheritedPropertiesBase
 {
-    public bool IsObsolete { get; set; }
     public List<string> IgnoredObjectNames { get; }
     public List<string> IgnoredObjectRelativePaths { get; }
 
