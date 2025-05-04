@@ -11,18 +11,15 @@ namespace prjBuildApp.Services
 {
     public class FileSystemService
     {
-        // Fields
         private readonly LoggingService _loggingService;
         private readonly Settings _settings;
 
-        // Constructor
         public FileSystemService(LoggingService loggingService, Settings settings)
         {
             _loggingService = loggingService;
             _settings = settings;
         }
 
-        // Public Methods - File and Directory Operations
         public bool IsIgnored(string path, string relativePath)
         {
             // Check if the file or directory should be ignored based on name
@@ -137,7 +134,6 @@ namespace prjBuildApp.Services
             return Path.Combine(archiveDirectory, project.Name);
         }
 
-        // Public Methods - Archive Operations
         /// <summary>
         /// Checks if all archives for a project exist
         /// </summary>

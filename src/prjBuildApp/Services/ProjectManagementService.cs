@@ -16,7 +16,6 @@ namespace prjBuildApp.Services
         private readonly Settings _settings;
         private List<SolutionInfo> _solutions = new();
 
-        // Constructor
         public ProjectManagementService(LoggingService loggingService, FileSystemService fileSystemService, Settings settings)
         {
             _loggingService = loggingService;
@@ -24,10 +23,7 @@ namespace prjBuildApp.Services
             _settings = settings;
         }
 
-        // Properties
         public List<SolutionInfo> Solutions => _solutions;
-
-        // Public Methods
 
         public void DiscoverSolutions()
         {
@@ -105,7 +101,6 @@ namespace prjBuildApp.Services
             }
         }
 
-        // Private Methods
         private void DiscoverProjects(SolutionInfo solution)
         {
             // Find all C# project files in the solution directory and subdirectories
@@ -190,6 +185,5 @@ namespace prjBuildApp.Services
                 _loggingService.Error(ex, "Error extracting version information for project {ProjectName}", project.Name);
             }
         }
-
     }
 }

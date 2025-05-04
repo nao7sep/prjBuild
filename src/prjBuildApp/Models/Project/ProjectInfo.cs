@@ -5,7 +5,6 @@ namespace prjBuildApp.Models.Project
 {
     public class ProjectInfo : InheritedPropertiesBase
     {
-        // Constructor
         public ProjectInfo(SolutionInfo solution, string name, string directoryPath, string filePath)
         {
             Solution = solution;
@@ -16,7 +15,6 @@ namespace prjBuildApp.Models.Project
             ReferencedProjects = new List<ProjectInfo>();
         }
 
-        // Properties
         public SolutionInfo Solution { get; }
         public string Name { get; }
         public string DirectoryPath { get; }
@@ -30,7 +28,6 @@ namespace prjBuildApp.Models.Project
         /// </summary>
         public bool IsArchived { get; set; }
 
-        // Methods
         /// <summary>
         /// Initializes inherited properties from global settings, solution configuration, and project configuration
         /// </summary>

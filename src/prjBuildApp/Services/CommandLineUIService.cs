@@ -8,7 +8,6 @@ namespace prjBuildApp.Services
 {
     public class CommandLineUIService
     {
-        // Fields
         private readonly LoggingService _loggingService;
         private readonly ProjectManagementService _projectManagementService;
         private readonly BuildService _buildService;
@@ -17,7 +16,6 @@ namespace prjBuildApp.Services
         private readonly List<ProjectInfo> _selectedProjects = new();
         private bool _showArchivedProjects = false;
 
-        // Constructor
         public CommandLineUIService(
             LoggingService loggingService,
             ProjectManagementService projectManagementService,
@@ -31,8 +29,6 @@ namespace prjBuildApp.Services
             _fileSystemService = fileSystemService;
             _settings = settings;
         }
-
-        // Public Methods
 
         public void Run()
         {
@@ -100,7 +96,6 @@ namespace prjBuildApp.Services
             _loggingService.Information("Exiting prjBuild application");
         }
 
-        // Private Methods - UI Menus
         private void DisplayProjectSelectionMenu()
         {
             Console.Clear();
@@ -138,7 +133,6 @@ namespace prjBuildApp.Services
             Console.WriteLine();
         }
 
-        // Private Methods - Project Selection
         private void SelectProject()
         {
             var allProjects = _projectManagementService.Solutions
@@ -238,7 +232,6 @@ namespace prjBuildApp.Services
             Console.ReadKey();
         }
 
-        // Private Methods - Operations
         private void DisplayOperationsMenu()
         {
             bool back = false;
