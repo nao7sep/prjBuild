@@ -100,6 +100,7 @@ namespace prjBuildApp.Services
         {
             Console.Clear();
             Console.WriteLine("=== prjBuild Project Selection ===");
+            Console.WriteLine();
 
             // Display all projects with selection status
             var allProjects = _projectManagementService.Solutions
@@ -233,6 +234,7 @@ namespace prjBuildApp.Services
                 }
             }
 
+            Console.WriteLine();
             Console.WriteLine("Options:");
             Console.WriteLine("1. Select project");
             Console.WriteLine("2. Deselect project");
@@ -289,6 +291,7 @@ namespace prjBuildApp.Services
             }
 
             Console.WriteLine("Selected projects for deselection:");
+            Console.WriteLine();
             // Sort the selected projects by solution name and then by project name
             var sortedProjects = _selectedProjects
                 .OrderBy(p => p.Solution.Name, StringComparer.OrdinalIgnoreCase)
@@ -363,6 +366,7 @@ namespace prjBuildApp.Services
             {
                 Console.Clear();
                 Console.WriteLine("=== prjBuild Operations ===");
+                Console.WriteLine();
 
                 Console.WriteLine($"Selected projects: {_selectedProjects.Count}");
 
@@ -387,6 +391,8 @@ namespace prjBuildApp.Services
                         Console.Write("(Solution version mismatch)");
                         Console.ForegroundColor = originalSolutionColor;
                     }
+
+                    Console.WriteLine();
 
                     // Sort projects within each solution group by project name
                     foreach (var project in solutionGroup.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase))
@@ -494,8 +500,11 @@ namespace prjBuildApp.Services
                             Console.WriteLine();
                         }
                     }
+
+                    Console.WriteLine();
                 }
 
+                Console.WriteLine();
                 Console.WriteLine("Operations:");
                 Console.WriteLine("1. Update NuGet packages - Check for and update all NuGet packages");
                 Console.WriteLine("2. Build projects - Restore dependencies and build projects");
@@ -596,6 +605,7 @@ namespace prjBuildApp.Services
         {
             Console.Clear();
             Console.WriteLine("=== Update NuGet packages ===");
+            Console.WriteLine();
 
             // Sort projects by dependencies
             var sortedProjects = SortProjectsByDependencies(_selectedProjects);
@@ -621,6 +631,7 @@ namespace prjBuildApp.Services
         {
             Console.Clear();
             Console.WriteLine("=== Build projects ===");
+            Console.WriteLine();
 
             // Sort projects by dependencies
             var sortedProjects = SortProjectsByDependencies(_selectedProjects);
@@ -647,6 +658,7 @@ namespace prjBuildApp.Services
             Console.Clear();
             Console.WriteLine("=== Rebuild and archive projects ===");
             Console.WriteLine("This will cleanup/rebuild projects and create archives");
+            Console.WriteLine();
 
             // Sort projects by dependencies
             var sortedProjects = SortProjectsByDependencies(_selectedProjects);
