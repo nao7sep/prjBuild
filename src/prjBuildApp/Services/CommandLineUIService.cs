@@ -530,12 +530,77 @@ namespace prjBuildApp.Services
             }
         }
 
+        /// <summary>
+        /// Sorts projects based on their dependencies using topological sort.
+        /// Projects with no dependencies come first, followed by projects that depend on them.
+        /// </summary>
+        /// <param name="projects">The list of projects to sort</param>
+        /// <returns>A new list with projects sorted by dependency order</returns>
+        private List<ProjectInfo> SortProjectsByDependencies(List<ProjectInfo> projects)
+        {
+            // Create a dictionary to track visited status for each project
+            var visited = new Dictionary<ProjectInfo, bool>();
+
+            // Initialize all projects as not visited
+            foreach (var project in projects)
+            {
+                visited[project] = false;
+            }
+
+            // Result list to store the sorted projects
+            var sortedProjects = new List<ProjectInfo>();
+
+            // Process each project
+            foreach (var project in projects)
+            {
+                if (!visited[project])
+                {
+                    // Perform depth-first search starting from this project
+                    VisitProjectDependencies(project, visited, sortedProjects, projects);
+                }
+            }
+
+            // The list is built in reverse order (dependencies last), so reverse it
+            sortedProjects.Reverse();
+
+            return sortedProjects;
+        }
+
+        /// <summary>
+        /// Helper method for the topological sort that performs a depth-first traversal
+        /// </summary>
+        private void VisitProjectDependencies(
+            ProjectInfo project,
+            Dictionary<ProjectInfo, bool> visited,
+            List<ProjectInfo> sortedProjects,
+            List<ProjectInfo> allowedProjects)
+        {
+            // Mark the current project as visited
+            visited[project] = true;
+
+            // Visit all referenced projects first (if they are in our allowed list)
+            foreach (var referencedProject in project.ReferencedProjects)
+            {
+                // Only process references that are in our selected projects list
+                if (allowedProjects.Contains(referencedProject) && !visited[referencedProject])
+                {
+                    VisitProjectDependencies(referencedProject, visited, sortedProjects, allowedProjects);
+                }
+            }
+
+            // After visiting all dependencies, add this project to the result
+            sortedProjects.Add(project);
+        }
+
         private void UpdateNuGetPackages()
         {
             Console.Clear();
-            Console.WriteLine("=== Update dependencies ===");
+            Console.WriteLine("=== Update NuGet packages ===");
 
-            foreach (var project in _selectedProjects)
+            // Sort projects by dependencies
+            var sortedProjects = SortProjectsByDependencies(_selectedProjects);
+
+            foreach (var project in sortedProjects)
             {
                 _loggingService.Information("Updating NuGet packages for {SolutionName} / {ProjectName}...",
                     project.Solution.Name, project.Name);
@@ -543,7 +608,7 @@ namespace prjBuildApp.Services
 
                 foreach (var line in output)
                 {
-                    _loggingService.Debug("NuGet: {Line}", line);
+                    _loggingService.Debug("Output: {Line}", line);
                 }
             }
 
@@ -555,17 +620,20 @@ namespace prjBuildApp.Services
         private void BuildProjects()
         {
             Console.Clear();
-            Console.WriteLine("=== Compile projects ===");
+            Console.WriteLine("=== Build projects ===");
 
-            foreach (var project in _selectedProjects)
+            // Sort projects by dependencies
+            var sortedProjects = SortProjectsByDependencies(_selectedProjects);
+
+            foreach (var project in sortedProjects)
             {
-                _loggingService.Information("Building {SolutionName} - {ProjectName}...",
+                _loggingService.Information("Building {SolutionName} / {ProjectName}...",
                     project.Solution.Name, project.Name);
                 var output = _buildService.BuildProject(project);
 
                 foreach (var line in output)
                 {
-                    _loggingService.Debug("Build output: {Line}", line);
+                    _loggingService.Debug("Output: {Line}", line);
                 }
             }
 
@@ -577,12 +645,15 @@ namespace prjBuildApp.Services
         private void RebuildAndArchiveProjects()
         {
             Console.Clear();
-            Console.WriteLine("=== Cleanup and publish ===");
-            Console.WriteLine("This will clean projects, publish binaries, and create archives");
+            Console.WriteLine("=== Rebuild and archive projects ===");
+            Console.WriteLine("This will cleanup/rebuild projects and create archives");
 
-            foreach (var project in _selectedProjects)
+            // Sort projects by dependencies
+            var sortedProjects = SortProjectsByDependencies(_selectedProjects);
+
+            foreach (var project in sortedProjects)
             {
-                _loggingService.Information("Creating release for {SolutionName} - {ProjectName}...",
+                _loggingService.Information("Rebuilding and archiving {SolutionName} / {ProjectName}...",
                     project.Solution.Name, project.Name);
 
                 // Get the parent root directory for the solution
@@ -598,12 +669,12 @@ namespace prjBuildApp.Services
                     continue;
                 }
 
-                // First clean the project
-                _loggingService.Information("Cleaning project {ProjectName}...", project.Name);
-                var cleanOutput = _buildService.CleanupProject(project, true, true);
-                foreach (var line in cleanOutput)
+                // First cleanup the project
+                _loggingService.Information("Cleaning up project {ProjectName}...", project.Name);
+                var cleanupOutput = _buildService.CleanupProject(project, true, true);
+                foreach (var line in cleanupOutput)
                 {
-                    _loggingService.Debug("Clean output: {Line}", line);
+                    _loggingService.Debug("Output: {Line}", line);
                 }
 
                 // Then publish the project
@@ -617,37 +688,26 @@ namespace prjBuildApp.Services
                     var publishOutput = _buildService.PublishProject(project, publishDirectory, runtime);
                     foreach (var line in publishOutput)
                     {
-                        _loggingService.Debug("Publish output: {Line}", line);
+                        _loggingService.Debug("Output: {Line}", line);
                     }
                 }
 
                 // Then archive the project
-                // Get the solution archive directory and create project-specific subdirectory
-                string solutionArchiveDir = _fileSystemService.GetSolutionArchiveDirectory(project.Solution);
-                string archiveDirectory = Path.Combine(solutionArchiveDir, project.Name);
+                // Use the solution's archive directory path directly
+                string archiveDirectory = project.Solution.ArchiveDirectoryPath;
                 _loggingService.Information("Using archive directory: {ArchiveDirectory}", archiveDirectory);
 
                 var archiveOutput = _buildService.ArchiveProject(project, archiveDirectory, supportedRuntimes);
                 foreach (var line in archiveOutput)
                 {
-                    _loggingService.Debug("Archive output: {Line}", line);
+                    _loggingService.Debug("Output: {Line}", line);
                 }
 
-                // Update solution archive status if needed
-                bool archivesExist = _fileSystemService.AreAllArchivesExisting(project.Solution);
-                project.Solution.AreAllArchivesExisting = archivesExist;
-                if (archivesExist)
-                {
-                    _loggingService.Information("Project {ProjectName} has been successfully archived", project.Name);
-                }
-                else
-                {
-                    _loggingService.Warning("Project {ProjectName} archiving may have failed", project.Name);
-                }
+                // Log that archiving is complete
+                _loggingService.Information("Project {ProjectName} archiving completed", project.Name);
             }
 
-            _loggingService.Information("Release creation completed");
+            _loggingService.Information("Rebuild and archive completed");
         }
-
     }
 }
