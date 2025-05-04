@@ -10,12 +10,13 @@ namespace prjBuildApp.Services
 {
     public class ProjectManagementService
     {
+        // Fields
         private readonly LoggingService _loggingService;
         private readonly FileSystemService _fileSystemService;
         private readonly Settings _settings;
-
         private List<SolutionInfo> _solutions = new();
 
+        // Constructor
         public ProjectManagementService(LoggingService loggingService, FileSystemService fileSystemService, Settings settings)
         {
             _loggingService = loggingService;
@@ -23,7 +24,10 @@ namespace prjBuildApp.Services
             _settings = settings;
         }
 
+        // Properties
         public List<SolutionInfo> Solutions => _solutions;
+
+        // Public Methods
 
         public void DiscoverSolutions()
         {
@@ -72,8 +76,36 @@ namespace prjBuildApp.Services
 
             _loggingService.Information("Discovered {SolutionCount} solutions with {ProjectCount} projects",
                 _solutions.Count, _solutions.Sum(s => s.Projects.Count));
+
+            // Update archive status for all projects
+            UpdateProjectArchiveStatus();
         }
 
+        /// <summary>
+        /// Updates the IsArchived status for all projects
+        /// </summary>
+        public void UpdateProjectArchiveStatus()
+        {
+            foreach (var solution in _solutions)
+            {
+                foreach (var project in solution.Projects)
+                {
+                    // Check if all archives for this project exist
+                    project.IsArchived = _fileSystemService.AreAllArchivesExisting(project, project.SupportedRuntimes);
+
+                    if (project.IsArchived)
+                    {
+                        _loggingService.Debug("Project {ProjectName} is already archived", project.Name);
+                    }
+                    else
+                    {
+                        _loggingService.Debug("Project {ProjectName} needs to be archived", project.Name);
+                    }
+                }
+            }
+        }
+
+        // Private Methods
         private void DiscoverProjects(SolutionInfo solution)
         {
             // Find all C# project files in the solution directory and subdirectories
@@ -158,5 +190,6 @@ namespace prjBuildApp.Services
                 _loggingService.Error(ex, "Error extracting version information for project {ProjectName}", project.Name);
             }
         }
+
     }
 }

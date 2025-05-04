@@ -5,12 +5,7 @@ namespace prjBuildApp.Models.Project
 {
     public class SolutionInfo : InheritedPropertiesBase
     {
-        public string Name { get; }
-        public string DirectoryPath { get; }
-        public string FilePath { get; }
-        public List<ProjectInfo> Projects { get; } = new();
-        public string SourceArchivePath { get; set; }
-
+        // Constructor
         public SolutionInfo(string name, string directoryPath, string filePath)
         {
             Name = name;
@@ -19,6 +14,14 @@ namespace prjBuildApp.Models.Project
             SourceArchivePath = string.Empty;
         }
 
+        // Properties
+        public string Name { get; }
+        public string DirectoryPath { get; }
+        public string FilePath { get; }
+        public List<ProjectInfo> Projects { get; } = new();
+        public string SourceArchivePath { get; set; }
+
+        // Methods
         /// <summary>
         /// Initializes inherited properties from global settings and solution configuration
         /// </summary>
@@ -26,11 +29,6 @@ namespace prjBuildApp.Models.Project
         /// <param name="solutionConfig">Solution-specific configuration</param>
         public void InitializeInheritedProperties(Settings? globalSettings, SolutionConfig? solutionConfig)
         {
-            // Set IsObsolete from solution configuration if available
-            if (solutionConfig != null)
-            {
-                IsObsolete = solutionConfig.IsObsolete;
-            }
 
             // Merge ignore lists from global settings and solution configuration
             IgnoredObjectNames.Clear();

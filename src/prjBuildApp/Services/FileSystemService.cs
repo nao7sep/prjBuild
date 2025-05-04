@@ -5,19 +5,24 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 
+using prjBuildApp.Models.Project;
+
 namespace prjBuildApp.Services
 {
     public class FileSystemService
     {
+        // Fields
         private readonly LoggingService _loggingService;
         private readonly Settings _settings;
 
+        // Constructor
         public FileSystemService(LoggingService loggingService, Settings settings)
         {
             _loggingService = loggingService;
             _settings = settings;
         }
 
+        // Public Methods - File and Directory Operations
         public bool IsIgnored(string path, string relativePath)
         {
             // Check if the file or directory should be ignored based on name
@@ -102,6 +107,97 @@ namespace prjBuildApp.Services
                 _loggingService.Error(ex, "Error creating archive {ArchiveFile} from {SourceDirectory}", destinationArchiveFile, sourceDirectory);
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Gets the archive directory path for a project
+        /// </summary>
+        /// <param name="project">The project to get the archive directory for</param>
+        /// <returns>The archive directory path</returns>
+        public string GetArchiveDirectory(ProjectInfo project)
+        {
+            // Find the root directory config for this project
+            var rootDir = project.Solution.DirectoryPath;
+            var rootDirConfig = _settings.RootDirectories.FirstOrDefault(rd =>
+                rootDir.StartsWith(rd.DirectoryPath, StringComparison.OrdinalIgnoreCase));
+
+            string archiveDirectory;
+            if (rootDirConfig != null && !string.IsNullOrEmpty(rootDirConfig.ArchiveDirectoryPath))
+            {
+                // Use the configured archive directory path
+                archiveDirectory = rootDirConfig.ArchiveDirectoryPath;
+            }
+            else
+            {
+                // Fall back to default archive directory
+                archiveDirectory = Path.Combine(rootDir, "archives");
+            }
+
+            // Create project-specific subdirectory in the archive directory
+            return Path.Combine(archiveDirectory, project.Name);
+        }
+
+        // Public Methods - Archive Operations
+        /// <summary>
+        /// Checks if all archives for a project exist
+        /// </summary>
+        /// <param name="project">The project to check</param>
+        /// <param name="supportedRuntimes">List of supported runtimes for the project</param>
+        /// <returns>True if all archives exist, false otherwise</returns>
+        public bool AreAllArchivesExisting(ProjectInfo project, List<string> supportedRuntimes)
+        {
+            // Check source archive
+            var (_, sourceArchivePath) = GetArchiveFileInfo(project);
+            if (!File.Exists(sourceArchivePath))
+            {
+                return false;
+            }
+
+            // Check binary archives for each runtime
+            foreach (var runtime in supportedRuntimes)
+            {
+                var (_, binaryArchivePath) = GetArchiveFileInfo(project, runtime);
+                if (!File.Exists(binaryArchivePath))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Gets the archive file name and path for a project
+        /// </summary>
+        /// <param name="project">The project to get the archive file for</param>
+        /// <param name="runtime">The runtime identifier (null for source archives)</param>
+        /// <returns>A tuple containing the archive file name and full path</returns>
+        public (string fileName, string filePath) GetArchiveFileInfo(ProjectInfo project, string? runtime = null)
+        {
+            // Get the primary version string from the project's VersionManager
+            var primaryVersionSource = project.VersionManager.GetPrimaryVersionSource();
+            string versionString = primaryVersionSource?.VersionString ?? "0.0.0.0";
+
+            string fileName;
+            if (runtime == null)
+            {
+                // Source archive: (projectName)-(primaryVersionString)-src.zip
+                fileName = $"{project.Name}-v{versionString}-src.zip";
+            }
+            else
+            {
+                // Executable archive: (projectName)-(primaryVersionString)-(supportedRuntime).zip
+                fileName = $"{project.Name}-v{versionString}-{runtime}.zip";
+            }
+
+            // Get the archive directory
+            string archiveDirectory = GetArchiveDirectory(project);
+
+            // Ensure the directory exists
+            CreateDirectory(archiveDirectory);
+
+            string filePath = Path.Combine(archiveDirectory, fileName);
+            return (fileName, filePath);
         }
     }
 }

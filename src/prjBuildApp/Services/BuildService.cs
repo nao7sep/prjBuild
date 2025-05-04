@@ -9,15 +9,18 @@ namespace prjBuildApp.Services
 {
     public class BuildService
     {
+        // Fields
         private readonly LoggingService _loggingService;
         private readonly FileSystemService _fileSystemService;
 
+        // Constructor
         public BuildService(LoggingService loggingService, FileSystemService fileSystemService)
         {
             _loggingService = loggingService;
             _fileSystemService = fileSystemService;
         }
 
+        // Public Methods - Package Management
         public List<string> UpdateNuGetPackages(ProjectInfo project)
         {
             var output = new List<string>();
@@ -93,6 +96,7 @@ namespace prjBuildApp.Services
             return output;
         }
 
+        // Public Methods - Build Operations
         public List<string> BuildProject(ProjectInfo project, string? runtime = null, bool noRestore = false)
         {
             var output = new List<string>();
@@ -187,6 +191,7 @@ namespace prjBuildApp.Services
             return output;
         }
 
+        // Public Methods - Cleanup and Archive
         public List<string> CleanupProject(ProjectInfo project, bool deleteBinDirectory = false, bool deleteObjDirectory = true)
         {
             var output = new List<string>();
@@ -258,26 +263,25 @@ namespace prjBuildApp.Services
                     string binDir = Path.Combine(project.DirectoryPath, "bin", "Release", "net9.0", runtime);
                     if (Directory.Exists(binDir))
                     {
-                        string archiveFileName = $"{project.Name}-{runtime}.zip";
-                        string archiveFilePath = Path.Combine(archiveDirectory, archiveFileName);
+                        var (archiveFileName, archiveFilePath) = _fileSystemService.GetArchiveFileInfo(project, runtime);
 
                         if (_fileSystemService.CreateZipArchive(binDir, archiveFilePath))
                         {
                             output.Add($"Created binary archive: {archiveFilePath}");
-                            _loggingService.Information("Created binary archive for project {ProjectName} and runtime {Runtime}",
-                                project.Name, runtime);
+                            _loggingService.Information("Created binary archive for project {ProjectName} and runtime {Runtime}: {ArchiveFileName}",
+                                project.Name, runtime, archiveFileName);
                         }
                     }
                 }
 
                 // Archive source code
-                string sourceArchiveFileName = $"{project.Name}-src.zip";
-                string sourceArchiveFilePath = Path.Combine(archiveDirectory, sourceArchiveFileName);
+                var (sourceArchiveFileName, sourceArchiveFilePath) = _fileSystemService.GetArchiveFileInfo(project);
 
                 if (_fileSystemService.CreateZipArchive(project.DirectoryPath, sourceArchiveFilePath))
                 {
                     output.Add($"Created source archive: {sourceArchiveFilePath}");
-                    _loggingService.Information("Created source archive for project {ProjectName}", project.Name);
+                    _loggingService.Information("Created source archive for project {ProjectName}: {ArchiveFileName}",
+                        project.Name, sourceArchiveFileName);
                 }
             }
             catch (Exception ex)
@@ -289,6 +293,7 @@ namespace prjBuildApp.Services
             return output;
         }
 
+        // Private Methods
         private List<string> RunDotNetCommand(List<string> arguments, string workingDirectory)
         {
             var output = new List<string>();

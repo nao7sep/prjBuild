@@ -8,22 +8,31 @@ namespace prjBuildApp.Services
 {
     public class CommandLineUIService
     {
+        // Fields
         private readonly LoggingService _loggingService;
         private readonly ProjectManagementService _projectManagementService;
         private readonly BuildService _buildService;
-
+        private readonly FileSystemService _fileSystemService;
+        private readonly Models.Configuration.Settings _settings;
         private readonly List<ProjectInfo> _selectedProjects = new();
-        private bool _showObsoleteItems = false;
+        private bool _showArchivedProjects = false;
 
+        // Constructor
         public CommandLineUIService(
             LoggingService loggingService,
             ProjectManagementService projectManagementService,
-            BuildService buildService)
+            BuildService buildService,
+            FileSystemService fileSystemService,
+            Models.Configuration.Settings settings)
         {
             _loggingService = loggingService;
             _projectManagementService = projectManagementService;
             _buildService = buildService;
+            _fileSystemService = fileSystemService;
+            _settings = settings;
         }
+
+        // Public Methods
 
         public void Run()
         {
@@ -74,7 +83,7 @@ namespace prjBuildApp.Services
                         }
                         break;
                     case "6":
-                        ToggleObsoleteItemsDisplay();
+                        ToggleArchivedProjectsDisplay();
                         break;
                     case "7":
                     case "q":
@@ -91,16 +100,19 @@ namespace prjBuildApp.Services
             _loggingService.Information("Exiting prjBuild application");
         }
 
+        // Private Methods - UI Menus
         private void DisplayProjectSelectionMenu()
         {
             Console.Clear();
             Console.WriteLine("=== prjBuild Project Selection ===");
             Console.WriteLine();
 
+            // Update archive status for all projects
+            _projectManagementService.UpdateProjectArchiveStatus();
+
             // Display all projects with selection status
             var allProjects = _projectManagementService.Solutions
-                .Where(s => _showObsoleteItems || !s.IsObsolete)
-                .SelectMany(s => s.Projects.Where(p => _showObsoleteItems || !p.IsObsolete))
+                .SelectMany(s => s.Projects.Where(p => !p.IsArchived || _showArchivedProjects))
                 .OrderBy(p => p.Solution.Name)
                 .ThenBy(p => p.Name)
                 .ToList();
@@ -110,7 +122,8 @@ namespace prjBuildApp.Services
             {
                 var project = allProjects[i];
                 string selectionStatus = _selectedProjects.Contains(project) ? "[X]" : "[ ]";
-                Console.WriteLine($"{i + 1}. {selectionStatus} {project.Solution.Name} / {project.Name}");
+                string archiveStatus = project.IsArchived ? "[Archived]" : "[Not Archived]";
+                Console.WriteLine($"{i + 1}. {selectionStatus} {archiveStatus} {project.Solution.Name} / {project.Name}");
             }
 
             Console.WriteLine();
@@ -120,16 +133,16 @@ namespace prjBuildApp.Services
             Console.WriteLine("3. Select all projects");
             Console.WriteLine("4. Deselect all projects");
             Console.WriteLine("5. Operations menu");
-            Console.WriteLine($"6. {(_showObsoleteItems ? "Hide" : "Show")} obsolete items");
+            Console.WriteLine($"6. {(_showArchivedProjects ? "Hide" : "Show")} archived projects");
             Console.WriteLine("7. Exit");
             Console.WriteLine();
         }
 
+        // Private Methods - Project Selection
         private void SelectProject()
         {
             var allProjects = _projectManagementService.Solutions
-                .Where(s => _showObsoleteItems || !s.IsObsolete)
-                .SelectMany(s => s.Projects.Where(p => _showObsoleteItems || !p.IsObsolete))
+                .SelectMany(s => s.Projects.Where(p => !p.IsArchived || _showArchivedProjects))
                 .OrderBy(p => p.Solution.Name)
                 .ThenBy(p => p.Name)
                 .ToList();
@@ -194,9 +207,9 @@ namespace prjBuildApp.Services
         {
             _selectedProjects.Clear();
 
-            foreach (var solution in _projectManagementService.Solutions.Where(s => _showObsoleteItems || !s.IsObsolete))
+            foreach (var solution in _projectManagementService.Solutions)
             {
-                foreach (var project in solution.Projects.Where(p => _showObsoleteItems || !p.IsObsolete))
+                foreach (var project in solution.Projects.Where(p => !p.IsArchived || _showArchivedProjects))
                 {
                     _selectedProjects.Add(project);
                 }
@@ -217,14 +230,15 @@ namespace prjBuildApp.Services
             Console.ReadKey();
         }
 
-        private void ToggleObsoleteItemsDisplay()
+        private void ToggleArchivedProjectsDisplay()
         {
-            _showObsoleteItems = !_showObsoleteItems;
-            _loggingService.Information("{Action} obsolete items", _showObsoleteItems ? "Showing" : "Hiding");
+            _showArchivedProjects = !_showArchivedProjects;
+            _loggingService.Information("{Action} archived projects", _showArchivedProjects ? "Showing" : "Hiding");
             Console.WriteLine("Press any key to continue...");
             Console.ReadKey();
         }
 
+        // Private Methods - Operations
         private void DisplayOperationsMenu()
         {
             bool back = false;
@@ -237,7 +251,8 @@ namespace prjBuildApp.Services
                 Console.WriteLine($"Selected projects: {_selectedProjects.Count}");
                 foreach (var project in _selectedProjects)
                 {
-                    Console.WriteLine($"- {project.Solution.Name} / {project.Name}");
+                    string archiveStatus = project.IsArchived ? "[Archived]" : "[Not Archived]";
+                    Console.WriteLine($"- {archiveStatus} {project.Solution.Name} / {project.Name}");
                 }
 
                 Console.WriteLine();
@@ -362,8 +377,8 @@ namespace prjBuildApp.Services
                 // Then publish the project
                 string publishDirectory = Path.Combine(rootDir, "publish", project.Name);
 
-                // For simplicity, we'll just use a default runtime
-                var supportedRuntimes = new List<string> { "win-x64" };
+                // Use the project's supported runtimes
+                var supportedRuntimes = project.SupportedRuntimes;
 
                 foreach (var runtime in supportedRuntimes)
                 {
@@ -375,11 +390,25 @@ namespace prjBuildApp.Services
                 }
 
                 // Then archive the project
-                string archiveDirectory = Path.Combine(rootDir, "archives");
+                // Get the archive directory using the FileSystemService
+                string archiveDirectory = _fileSystemService.GetArchiveDirectory(project);
+                _loggingService.Information("Using archive directory: {ArchiveDirectory}", archiveDirectory);
+
                 var archiveOutput = _buildService.ArchiveProject(project, archiveDirectory, supportedRuntimes);
                 foreach (var line in archiveOutput)
                 {
                     _loggingService.Debug("Archive output: {Line}", line);
+                }
+
+                // Update archive status
+                project.IsArchived = _fileSystemService.AreAllArchivesExisting(project, supportedRuntimes);
+                if (project.IsArchived)
+                {
+                    _loggingService.Information("Project {ProjectName} has been successfully archived", project.Name);
+                }
+                else
+                {
+                    _loggingService.Warning("Project {ProjectName} archiving may have failed", project.Name);
                 }
 
                 Console.WriteLine();

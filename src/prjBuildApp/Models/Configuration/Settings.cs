@@ -22,7 +22,6 @@ namespace prjBuildApp.Models.Configuration
     public class SolutionConfig
     {
         public string Name { get; set; } = string.Empty;
-        public bool IsObsolete { get; set; } = false;
         public RootDirectoryConfig? ParentRootDirectory { get; set; }
         public List<ProjectConfig> Projects { get; set; } = new();
 
@@ -35,7 +34,6 @@ namespace prjBuildApp.Models.Configuration
     {
         // Core configuration
         public string Name { get; set; } = string.Empty;
-        public bool IsObsolete { get; set; } = false;
         public List<string> SupportedRuntimes { get; set; } = new();
 
         // Project-specific ignore patterns

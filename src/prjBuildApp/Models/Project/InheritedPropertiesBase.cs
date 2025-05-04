@@ -10,11 +10,6 @@ namespace prjBuildApp.Models.Project
     public abstract class InheritedPropertiesBase
     {
         /// <summary>
-        /// Indicates if the object is obsolete and should be excluded from normal operations
-        /// </summary>
-        public bool IsObsolete { get; set; }
-
-        /// <summary>
         /// List of object names that should be ignored during operations
         /// </summary>
         public List<string> IgnoredObjectNames { get; } = new();

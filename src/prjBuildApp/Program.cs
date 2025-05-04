@@ -31,7 +31,7 @@ namespace prjBuildApp
                 var buildService = new BuildService(loggingService, fileSystemService);
 
                 // Create command-line UI service
-                var commandLineUIService = new CommandLineUIService(loggingService, projectManagementService, buildService);
+                var commandLineUIService = new CommandLineUIService(loggingService, projectManagementService, buildService, fileSystemService, configService.Settings);
 
                 // Run the application
                 commandLineUIService.Run();

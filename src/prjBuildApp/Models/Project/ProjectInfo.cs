@@ -5,13 +5,7 @@ namespace prjBuildApp.Models.Project
 {
     public class ProjectInfo : InheritedPropertiesBase
     {
-        public SolutionInfo Solution { get; }
-        public string Name { get; }
-        public string DirectoryPath { get; }
-        public string FilePath { get; }
-        public VersionManager VersionManager { get; }
-        public List<ProjectInfo> ReferencedProjects { get; }
-
+        // Constructor
         public ProjectInfo(SolutionInfo solution, string name, string directoryPath, string filePath)
         {
             Solution = solution;
@@ -22,6 +16,21 @@ namespace prjBuildApp.Models.Project
             ReferencedProjects = new List<ProjectInfo>();
         }
 
+        // Properties
+        public SolutionInfo Solution { get; }
+        public string Name { get; }
+        public string DirectoryPath { get; }
+        public string FilePath { get; }
+        public VersionManager VersionManager { get; }
+        public List<ProjectInfo> ReferencedProjects { get; }
+        public List<string> SupportedRuntimes { get; } = new();
+
+        /// <summary>
+        /// Indicates if the project has been archived (all archives exist)
+        /// </summary>
+        public bool IsArchived { get; set; }
+
+        // Methods
         /// <summary>
         /// Initializes inherited properties from global settings, solution configuration, and project configuration
         /// </summary>
@@ -30,10 +39,16 @@ namespace prjBuildApp.Models.Project
         /// <param name="projectConfig">Project-specific configuration</param>
         public void InitializeInheritedProperties(Settings? globalSettings, SolutionConfig? solutionConfig, ProjectConfig? projectConfig)
         {
-            // Set IsObsolete from project configuration if available
-            if (projectConfig != null)
+            // Initialize supported runtimes from project configuration
+            SupportedRuntimes.Clear();
+            if (projectConfig?.SupportedRuntimes != null && projectConfig.SupportedRuntimes.Count > 0)
             {
-                IsObsolete = projectConfig.IsObsolete;
+                SupportedRuntimes.AddRange(projectConfig.SupportedRuntimes);
+            }
+            else
+            {
+                // Default to win-x64 if not specified
+                SupportedRuntimes.Add("win-x64");
             }
 
             // Merge ignore lists from all three levels: global, solution, and project
