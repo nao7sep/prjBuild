@@ -83,7 +83,7 @@ namespace prjBuildApp.Services
             }
         }
 
-        public bool CreateZipArchive(string sourceDirectory, string destinationArchiveFile, bool includeBaseDirectory = true)
+        public bool CreateZipArchive(string sourceDirectory, string destinationArchiveFile)
         {
             try
             {
@@ -94,27 +94,46 @@ namespace prjBuildApp.Services
                     Directory.CreateDirectory(destinationDirectory);
                 }
 
-                // Create the archive
-                ZipFile.CreateFromDirectory(sourceDirectory, destinationArchiveFile, CompressionLevel.Optimal, includeBaseDirectory);
-                _loggingService.Information("Created archive {ArchiveFile} from {SourceDirectory}", destinationArchiveFile, sourceDirectory);
+                // Create the archive with relative paths
+                using (var archive = ZipFile.Open(destinationArchiveFile, ZipArchiveMode.Create))
+                {
+                    // Get all files in the source directory (recursively)
+                    var files = Directory.GetFiles(sourceDirectory, "*", SearchOption.AllDirectories);
+
+                    foreach (var file in files)
+                    {
+                        // Use the relative path without the base directory
+                        string entryName = Path.GetRelativePath(sourceDirectory, file);
+
+                        // Replace Windows backslashes with forward slashes for zip entries
+                        entryName = entryName.Replace('\\', '/');
+
+                        // Create the entry and copy the file content
+                        archive.CreateEntryFromFile(file, entryName, CompressionLevel.Optimal);
+                    }
+                }
+
+                _loggingService.Information("Created archive {ArchiveFile} from {SourceDirectory} with relative paths",
+                    destinationArchiveFile, sourceDirectory);
                 return true;
             }
             catch (Exception ex)
             {
-                _loggingService.Error(ex, "Error creating archive {ArchiveFile} from {SourceDirectory}", destinationArchiveFile, sourceDirectory);
+                _loggingService.Error(ex, "Error creating archive {ArchiveFile} from {SourceDirectory}",
+                    destinationArchiveFile, sourceDirectory);
                 return false;
             }
         }
 
         /// <summary>
-        /// Gets the archive directory path for a project
+        /// Gets the archive directory path for a solution
         /// </summary>
-        /// <param name="project">The project to get the archive directory for</param>
+        /// <param name="solution">The solution to get the archive directory for</param>
         /// <returns>The archive directory path</returns>
-        public string GetArchiveDirectory(ProjectInfo project)
+        public string GetSolutionArchiveDirectory(SolutionInfo solution)
         {
-            // Find the root directory config for this project
-            var rootDir = project.Solution.DirectoryPath;
+            // Find the root directory config for this solution
+            var rootDir = solution.DirectoryPath;
             var rootDirConfig = _settings.RootDirectories.FirstOrDefault(rd =>
                 rootDir.StartsWith(rd.DirectoryPath, StringComparison.OrdinalIgnoreCase));
 
@@ -126,34 +145,32 @@ namespace prjBuildApp.Services
             }
             else
             {
-                // Fall back to default archive directory
-                archiveDirectory = Path.Combine(rootDir, "archives");
+                throw new InvalidOperationException($"No archive directory path configured for root directory: {rootDir}");
             }
 
-            // Create project-specific subdirectory in the archive directory
-            return Path.Combine(archiveDirectory, project.Name);
+            // Create solution-specific subdirectory in the archive directory
+            string solutionArchiveDir = Path.Combine(archiveDirectory, solution.Name);
+
+            return solutionArchiveDir;
         }
 
         /// <summary>
         /// Checks if all archives for a project exist
         /// </summary>
         /// <param name="project">The project to check</param>
-        /// <param name="supportedRuntimes">List of supported runtimes for the project</param>
         /// <returns>True if all archives exist, false otherwise</returns>
-        public bool AreAllArchivesExisting(ProjectInfo project, List<string> supportedRuntimes)
+        public bool AreAllArchivesExisting(ProjectInfo project)
         {
-            // Check source archive
-            var (_, sourceArchivePath) = GetArchiveFileInfo(project);
-            if (!File.Exists(sourceArchivePath))
+            // Check if solution source archive exists
+            if (!File.Exists(project.Solution.SourceArchivePath))
             {
                 return false;
             }
 
-            // Check binary archives for each runtime
-            foreach (var runtime in supportedRuntimes)
+            // Check all binary archives in the RuntimeArchivePaths dictionary
+            foreach (var archivePath in project.RuntimeArchivePaths.Values)
             {
-                var (_, binaryArchivePath) = GetArchiveFileInfo(project, runtime);
-                if (!File.Exists(binaryArchivePath))
+                if (!File.Exists(archivePath))
                 {
                     return false;
                 }
@@ -163,37 +180,94 @@ namespace prjBuildApp.Services
         }
 
         /// <summary>
-        /// Gets the archive file name and path for a project
+        /// Gets the source code archive path for a solution
         /// </summary>
-        /// <param name="project">The project to get the archive file for</param>
-        /// <param name="runtime">The runtime identifier (null for source archives)</param>
-        /// <returns>A tuple containing the archive file name and full path</returns>
-        public (string fileName, string filePath) GetArchiveFileInfo(ProjectInfo project, string? runtime = null)
+        /// <param name="solution">The solution to get the source archive for</param>
+        /// <returns>The source archive file path</returns>
+        public string GetSolutionSourceArchivePath(SolutionInfo solution)
         {
-            // Get the primary version string from the project's VersionManager
-            var primaryVersionSource = project.VersionManager.GetPrimaryVersionSource();
-            string versionString = primaryVersionSource?.VersionString ?? "0.0.0.0";
-
-            string fileName;
-            if (runtime == null)
-            {
-                // Source archive: (projectName)-(primaryVersionString)-src.zip
-                fileName = $"{project.Name}-v{versionString}-src.zip";
-            }
-            else
-            {
-                // Executable archive: (projectName)-(primaryVersionString)-(supportedRuntime).zip
-                fileName = $"{project.Name}-v{versionString}-{runtime}.zip";
-            }
-
-            // Get the archive directory
-            string archiveDirectory = GetArchiveDirectory(project);
+            // Use the solution's archive directory path directly
+            string archiveDirectory = solution.ArchiveDirectoryPath;
 
             // Ensure the directory exists
             CreateDirectory(archiveDirectory);
 
-            string filePath = Path.Combine(archiveDirectory, fileName);
-            return (fileName, filePath);
+            string fileName;
+
+            // Try to get a primary version from one of the solution's projects
+            if (solution.Projects.Count > 0)
+            {
+                // Find the first project with a valid primary version
+                foreach (var project in solution.Projects)
+                {
+                    var primaryVersionSource = project.VersionManager.GetPrimaryVersionSource();
+                    if (primaryVersionSource?.ParsedVersion != null)
+                    {
+                        try
+                        {
+                            // Use our new formatting method to get "v{major}.{minor}"
+                            string formattedVersion = VersionManager.FormatVersion(primaryVersionSource.ParsedVersion);
+                            _loggingService.Debug("Using formatted version {Version} from project {ProjectName} for solution archive",
+                                formattedVersion, project.Name);
+
+                            // Solution archive: (solutionName)-(formattedVersion)-src.zip
+                            fileName = $"{solution.Name}-{formattedVersion}-src.zip";
+
+                            // Return the full path
+                            return Path.Combine(archiveDirectory, fileName);
+                        }
+                        catch (Exception ex)
+                        {
+                            _loggingService.Error(ex, "Error formatting version for solution archive");
+                        }
+                    }
+                }
+            }
+
+            // If we get here, no valid version was found - this is an error condition
+            string errorMessage = "No valid version found in solution projects";
+            _loggingService.Error(null, errorMessage);
+            throw new InvalidOperationException(errorMessage);
+        }
+
+        /// <summary>
+        /// Gets the runtime-specific executable archive file paths for a project
+        /// </summary>
+        /// <param name="project">The project to get the runtime archive files for</param>
+        /// <returns>A dictionary mapping runtime identifiers to executable archive paths</returns>
+        public Dictionary<string, string> GetProjectRuntimeArchivePaths(ProjectInfo project)
+        {
+            // Get the primary version from the project's VersionManager
+            var primaryVersionSource = project.VersionManager.GetPrimaryVersionSource();
+
+            if (primaryVersionSource?.ParsedVersion == null)
+            {
+                string errorMessage = $"No valid version found for project {project.Name}";
+                _loggingService.Error(null, errorMessage);
+                throw new InvalidOperationException(errorMessage);
+            }
+
+            // Format the version using our new method
+            string formattedVersion = VersionManager.FormatVersion(primaryVersionSource.ParsedVersion);
+
+            // Use the solution's archive directory path directly - no project subdirectory
+            string archiveDirectory = project.Solution.ArchiveDirectoryPath;
+
+            // Ensure the directory exists
+            CreateDirectory(archiveDirectory);
+
+            // Create a dictionary to hold the results
+            var archivePaths = new Dictionary<string, string>();
+
+            // Add runtime archive paths (binary archives)
+            foreach (var runtime in project.SupportedRuntimes)
+            {
+                string runtimeFileName = $"{project.Name}-{formattedVersion}-{runtime}.zip";
+                string runtimeFilePath = Path.Combine(archiveDirectory, runtimeFileName);
+                archivePaths[runtime] = runtimeFilePath;
+            }
+
+            return archivePaths;
         }
     }
 }

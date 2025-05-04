@@ -62,6 +62,15 @@ namespace prjBuildApp.Services
                         // This ensures the solution inherits properties from global settings
                         solution.InitializeInheritedProperties(_settings, solutionConfig);
 
+                        // Initialize archive directory path
+                        solution.ArchiveDirectoryPath = _fileSystemService.GetSolutionArchiveDirectory(solution);
+                        _loggingService.Debug("Solution archive directory: {ArchiveDirectoryPath}", solution.ArchiveDirectoryPath);
+
+                        // Initialize source archive path
+                        string sourceArchivePath = _fileSystemService.GetSolutionSourceArchivePath(solution);
+                        solution.SourceArchivePath = sourceArchivePath;
+                        _loggingService.Debug("Solution source archive path: {SourceArchivePath}", solution.SourceArchivePath);
+
                         _solutions.Add(solution);
 
                         // Discover projects in the solution
@@ -73,33 +82,9 @@ namespace prjBuildApp.Services
             _loggingService.Information("Discovered {SolutionCount} solutions with {ProjectCount} projects",
                 _solutions.Count, _solutions.Sum(s => s.Projects.Count));
 
-            // Update archive status for all projects
-            UpdateProjectArchiveStatus();
+            // Archive status is already checked during project discovery
         }
 
-        /// <summary>
-        /// Updates the IsArchived status for all projects
-        /// </summary>
-        public void UpdateProjectArchiveStatus()
-        {
-            foreach (var solution in _solutions)
-            {
-                foreach (var project in solution.Projects)
-                {
-                    // Check if all archives for this project exist
-                    project.IsArchived = _fileSystemService.AreAllArchivesExisting(project, project.SupportedRuntimes);
-
-                    if (project.IsArchived)
-                    {
-                        _loggingService.Debug("Project {ProjectName} is already archived", project.Name);
-                    }
-                    else
-                    {
-                        _loggingService.Debug("Project {ProjectName} needs to be archived", project.Name);
-                    }
-                }
-            }
-        }
 
         private void DiscoverProjects(SolutionInfo solution)
         {
@@ -129,10 +114,33 @@ namespace prjBuildApp.Services
                 // This ensures the project inherits properties from global settings and solution configuration
                 project.InitializeInheritedProperties(_settings, solutionConfig, projectConfig);
 
+                // Get all binary archive paths
+                var archivePaths = _fileSystemService.GetProjectRuntimeArchivePaths(project);
+
+                // Initialize runtime archive paths
+                foreach (var runtime in project.SupportedRuntimes)
+                {
+                    project.RuntimeArchivePaths[runtime] = archivePaths[runtime];
+                    _loggingService.Debug("Project runtime archive path for {Runtime}: {ArchivePath}",
+                        runtime, archivePaths[runtime]);
+                }
+
                 solution.Projects.Add(project);
 
                 // Extract version information
                 ExtractVersionInfo(project);
+
+                // Check if all archives for this project exist
+                project.IsArchived = _fileSystemService.AreAllArchivesExisting(project);
+
+                if (project.IsArchived)
+                {
+                    _loggingService.Debug("Project {ProjectName} is already archived", project.Name);
+                }
+                else
+                {
+                    _loggingService.Debug("Project {ProjectName} needs to be archived", project.Name);
+                }
             }
         }
 
@@ -177,6 +185,42 @@ namespace prjBuildApp.Services
                                 _loggingService.Debug("Extracted version {Version} from AssemblyInfo.cs", versionString);
                             }
                         }
+                    }
+                }
+
+                // Extract version from app.manifest if it exists
+                string manifestPath = Path.Combine(project.DirectoryPath, "app.manifest");
+                if (!File.Exists(manifestPath))
+                {
+                    // Also check in Properties folder
+                    manifestPath = Path.Combine(project.DirectoryPath, "Properties", "app.manifest");
+                }
+
+                if (File.Exists(manifestPath))
+                {
+                    try
+                    {
+                        var manifestXml = XDocument.Load(manifestPath);
+                        XNamespace ns = "urn:schemas-microsoft-com:asm.v1";
+
+                        // Look for assemblyIdentity element with version attribute
+                        var assemblyIdentity = manifestXml.Descendants(ns + "assemblyIdentity").FirstOrDefault();
+                        if (assemblyIdentity != null)
+                        {
+                            var versionAttribute = assemblyIdentity.Attribute("version");
+                            if (versionAttribute != null)
+                            {
+                                string versionString = versionAttribute.Value;
+                                var versionSource = new VersionSource(VersionSourceType.Manifest, manifestPath, versionString);
+                                project.VersionManager.VersionSources.Add(versionSource);
+
+                                _loggingService.Debug("Extracted version {Version} from app.manifest", versionString);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _loggingService.Warning("Error parsing app.manifest file {ManifestPath}: {ErrorMessage}", manifestPath, ex.Message);
                     }
                 }
             }

@@ -102,9 +102,6 @@ namespace prjBuildApp.Services
             Console.WriteLine("=== prjBuild Project Selection ===");
             Console.WriteLine();
 
-            // Update archive status for all projects
-            _projectManagementService.UpdateProjectArchiveStatus();
-
             // Display all projects with selection status
             var allProjects = _projectManagementService.Solutions
                 .SelectMany(s => s.Projects.Where(p => !p.IsArchived || _showArchivedProjects))
@@ -253,7 +250,8 @@ namespace prjBuildApp.Services
                 Console.WriteLine("1. Update NuGet packages - Check for and update all NuGet dependencies");
                 Console.WriteLine("2. Build - Restore dependencies and compile the project");
                 Console.WriteLine("3. Create Release - Clean, publish binaries, and archive source and binaries");
-                Console.WriteLine("4. Back to project selection");
+                Console.WriteLine("4. Archive Solutions - Create source archives for the solutions of selected projects");
+                Console.WriteLine("5. Back to project selection");
                 Console.WriteLine();
 
                 Console.Write("Enter your choice: ");
@@ -271,6 +269,9 @@ namespace prjBuildApp.Services
                         CreateRelease();
                         break;
                     case "4":
+                        ArchiveSolutions();
+                        break;
+                    case "5":
                     case "b":
                     case "back":
                         back = true;
@@ -383,8 +384,9 @@ namespace prjBuildApp.Services
                 }
 
                 // Then archive the project
-                // Get the archive directory using the FileSystemService
-                string archiveDirectory = _fileSystemService.GetArchiveDirectory(project);
+                // Get the solution archive directory and create project-specific subdirectory
+                string solutionArchiveDir = _fileSystemService.GetSolutionArchiveDirectory(project.Solution);
+                string archiveDirectory = Path.Combine(solutionArchiveDir, project.Name);
                 _loggingService.Information("Using archive directory: {ArchiveDirectory}", archiveDirectory);
 
                 var archiveOutput = _buildService.ArchiveProject(project, archiveDirectory, supportedRuntimes);
@@ -394,7 +396,7 @@ namespace prjBuildApp.Services
                 }
 
                 // Update archive status
-                project.IsArchived = _fileSystemService.AreAllArchivesExisting(project, supportedRuntimes);
+                project.IsArchived = _fileSystemService.AreAllArchivesExisting(project);
                 if (project.IsArchived)
                 {
                     _loggingService.Information("Project {ProjectName} has been successfully archived", project.Name);
@@ -408,6 +410,61 @@ namespace prjBuildApp.Services
             }
 
             _loggingService.Information("Release creation completed");
+        }
+
+        private void ArchiveSolutions()
+        {
+            Console.Clear();
+            Console.WriteLine("=== Archive Solutions ===");
+            Console.WriteLine("This will create source archives for the solutions of selected projects");
+            Console.WriteLine();
+
+            // Get unique solutions from selected projects
+            var solutions = _selectedProjects
+                .Select(p => p.Solution)
+                .Distinct()
+                .ToList();
+
+            if (solutions.Count == 0)
+            {
+                _loggingService.Warning("No solutions found for the selected projects");
+                Console.WriteLine("Press any key to continue...");
+                Console.ReadKey();
+                return;
+            }
+
+            _loggingService.Information("Found {SolutionCount} solutions to archive", solutions.Count);
+
+            foreach (var solution in solutions)
+            {
+                _loggingService.Information("Archiving solution {SolutionName}...", solution.Name);
+
+                // Archive the solution
+                var archiveOutput = _buildService.ArchiveSolution(solution);
+                foreach (var line in archiveOutput)
+                {
+                    _loggingService.Debug("Archive output: {Line}", line);
+                }
+
+                // Check if the solution archive exists
+                bool isArchived = File.Exists(solution.SourceArchivePath);
+                if (isArchived)
+                {
+                    _loggingService.Information("Solution {SolutionName} has been successfully archived", solution.Name);
+                    Console.WriteLine($"Solution {solution.Name} has been successfully archived");
+                }
+                else
+                {
+                    _loggingService.Warning("Solution {SolutionName} archiving may have failed", solution.Name);
+                    Console.WriteLine($"Solution {solution.Name} archiving may have failed");
+                }
+
+                Console.WriteLine();
+            }
+
+            _loggingService.Information("Solution archiving completed");
+            Console.WriteLine("Press any key to continue...");
+            Console.ReadKey();
             Console.WriteLine("Press any key to continue...");
             Console.ReadKey();
         }

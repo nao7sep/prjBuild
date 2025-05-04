@@ -258,7 +258,10 @@ namespace prjBuildApp.Services
                     string binDir = Path.Combine(project.DirectoryPath, "bin", "Release", "net9.0", runtime);
                     if (Directory.Exists(binDir))
                     {
-                        var (archiveFileName, archiveFilePath) = _fileSystemService.GetArchiveFileInfo(project, runtime);
+                        // Get all runtime archive paths
+                        var archivePaths = _fileSystemService.GetProjectRuntimeArchivePaths(project);
+                        string archiveFilePath = archivePaths[runtime];
+                        string archiveFileName = Path.GetFileName(archiveFilePath);
 
                         if (_fileSystemService.CreateZipArchive(binDir, archiveFilePath))
                         {
@@ -269,19 +272,67 @@ namespace prjBuildApp.Services
                     }
                 }
 
-                // Archive source code
-                var (sourceArchiveFileName, sourceArchiveFilePath) = _fileSystemService.GetArchiveFileInfo(project);
+                // Archive source code (at solution level)
+                var solution = project.Solution;
+                string sourceArchiveFilePath = _fileSystemService.GetSolutionSourceArchivePath(solution);
+                string sourceArchiveFileName = Path.GetFileName(sourceArchiveFilePath);
 
-                if (_fileSystemService.CreateZipArchive(project.DirectoryPath, sourceArchiveFilePath))
+                if (_fileSystemService.CreateZipArchive(solution.DirectoryPath, sourceArchiveFilePath))
                 {
-                    output.Add($"Created source archive: {sourceArchiveFilePath}");
-                    _loggingService.Information("Created source archive for project {ProjectName}: {ArchiveFileName}",
-                        project.Name, sourceArchiveFileName);
+                    output.Add($"Created source archive for solution: {sourceArchiveFilePath}");
+                    _loggingService.Information("Created source archive for solution {SolutionName}: {ArchiveFileName}",
+                        solution.Name, sourceArchiveFileName);
                 }
             }
             catch (Exception ex)
             {
                 _loggingService.Error(ex, "Error archiving project {ProjectName}", project.Name);
+                output.Add($"Error: {ex.Message}");
+            }
+
+            return output;
+        }
+
+        /// <summary>
+        /// Archives a solution by creating a zip file of its source code
+        /// </summary>
+        /// <param name="solution">The solution to archive</param>
+        /// <returns>A list of output messages from the archiving process</returns>
+        public List<string> ArchiveSolution(SolutionInfo solution)
+        {
+            var output = new List<string>();
+
+            try
+            {
+                _loggingService.Information("Archiving solution {SolutionName}", solution.Name);
+
+                // Get the archive file path for the solution
+                string archiveFilePath = _fileSystemService.GetSolutionSourceArchivePath(solution);
+
+                // Create the archive directory if it doesn't exist
+                string? archiveDirectory = Path.GetDirectoryName(archiveFilePath);
+                if (!string.IsNullOrEmpty(archiveDirectory) && !Directory.Exists(archiveDirectory))
+                {
+                    Directory.CreateDirectory(archiveDirectory);
+                }
+
+                // Archive the solution source code
+                if (_fileSystemService.CreateZipArchive(solution.DirectoryPath, archiveFilePath))
+                {
+                    output.Add($"Created solution archive: {archiveFilePath}");
+                    string fileName = Path.GetFileName(archiveFilePath);
+                    _loggingService.Information("Created archive for solution {SolutionName}: {ArchiveFileName}",
+                        solution.Name, fileName);
+                }
+                else
+                {
+                    output.Add($"Failed to create solution archive: {archiveFilePath}");
+                    _loggingService.Warning("Failed to create archive for solution {SolutionName}", solution.Name);
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.Error(ex, "Error archiving solution {SolutionName}", solution.Name);
                 output.Add($"Error: {ex.Message}");
             }
 

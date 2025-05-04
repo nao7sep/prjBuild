@@ -11,12 +11,22 @@ namespace prjBuildApp.Models.Project
             DirectoryPath = directoryPath;
             FilePath = filePath;
             SourceArchivePath = string.Empty;
+            ArchiveDirectoryPath = string.Empty;
         }
 
         public string Name { get; }
         public string DirectoryPath { get; }
         public string FilePath { get; }
         public List<ProjectInfo> Projects { get; } = new();
+
+        /// <summary>
+        /// Path to the directory where solution archives are stored
+        /// </summary>
+        public string ArchiveDirectoryPath { get; set; }
+
+        /// <summary>
+        /// Path to the source code archive file
+        /// </summary>
         public string SourceArchivePath { get; set; }
 
         /// <summary>
@@ -52,6 +62,15 @@ namespace prjBuildApp.Models.Project
                 mergedPaths.AddRange(solutionConfig.IgnoredObjectRelativePaths);
             }
             IgnoredObjectRelativePaths.AddRange(mergedPaths.Distinct());
+        }
+
+        /// <summary>
+        /// Validates that all projects in this solution have the same primary version
+        /// </summary>
+        /// <returns>True if all projects have the same primary version, false otherwise</returns>
+        public bool ValidateVersions()
+        {
+            return VersionManager.ValidateSolutionVersions(this);
         }
     }
 }

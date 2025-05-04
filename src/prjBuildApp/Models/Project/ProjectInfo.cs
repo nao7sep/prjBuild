@@ -13,6 +13,7 @@ namespace prjBuildApp.Models.Project
             FilePath = filePath;
             VersionManager = new VersionManager();
             ReferencedProjects = new List<ProjectInfo>();
+            RuntimeArchivePaths = new Dictionary<string, string>();
         }
 
         public SolutionInfo Solution { get; }
@@ -22,6 +23,11 @@ namespace prjBuildApp.Models.Project
         public VersionManager VersionManager { get; }
         public List<ProjectInfo> ReferencedProjects { get; }
         public List<string> SupportedRuntimes { get; } = new();
+
+        /// <summary>
+        /// Dictionary mapping runtime identifiers to their executable archive file paths
+        /// </summary>
+        public Dictionary<string, string> RuntimeArchivePaths { get; }
 
         /// <summary>
         /// Indicates if the project has been archived (all archives exist)
@@ -86,5 +92,13 @@ namespace prjBuildApp.Models.Project
             IgnoredObjectRelativePaths.AddRange(mergedPaths.Distinct());
         }
 
+        /// <summary>
+        /// Validates that all version sources within this project have the same version
+        /// </summary>
+        /// <returns>True if all versions match, false otherwise</returns>
+        public bool ValidateVersions()
+        {
+            return VersionManager.ValidateVersions();
+        }
     }
 }
