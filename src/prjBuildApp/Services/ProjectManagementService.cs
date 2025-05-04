@@ -67,13 +67,13 @@ namespace prjBuildApp.Services
                         solution.ArchiveDirectoryPath = _fileSystemService.GetSolutionArchiveDirectory(solution);
                         _loggingService.Debug("Solution archive directory: {ArchiveDirectoryPath}", solution.ArchiveDirectoryPath);
 
+                        // Discover projects in the solution
+                        DiscoverProjects(solution);
+
                         // Initialize source archive path
                         string sourceArchivePath = _fileSystemService.GetSolutionSourceArchivePath(solution);
                         solution.SourceArchivePath = sourceArchivePath;
                         _loggingService.Debug("Solution source archive path: {SourceArchivePath}", solution.SourceArchivePath);
-
-                        // Discover projects in the solution
-                        DiscoverProjects(solution);
 
                         // Validate versions across all projects in the solution
                         if (!solution.ValidateVersions())
