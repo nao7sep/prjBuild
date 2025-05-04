@@ -48,8 +48,9 @@ namespace prjBuildApp
                 }
                 Console.ResetColor();
 
-                // Ensure logs directory exists
-                Directory.CreateDirectory("logs");
+                // Ensure logs directory exists using AppContext.BaseDirectory
+                string logsDirectory = Path.Combine(AppContext.BaseDirectory, "logs");
+                Directory.CreateDirectory(logsDirectory);
 
                 // Log the error to a file with format matching Serilog's file output format exactly
                 string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
@@ -63,7 +64,7 @@ namespace prjBuildApp
                 }
 
                 File.AppendAllText(
-                    Path.Combine("logs", $"prjBuild-error-{DateTime.Now:yyyyMMdd-HHmmss}.log"),
+                    Path.Combine(logsDirectory, $"prjBuild-error-{DateTime.Now:yyyyMMdd-HHmmss}.log"),
                     logContent
                 );
             }

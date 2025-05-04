@@ -16,13 +16,13 @@ namespace prjBuildApp.Services
         {
             try
             {
-                // Build configuration
+                // Build configuration using AppContext.BaseDirectory instead of Directory.GetCurrentDirectory()
                 var builder = new ConfigurationBuilder()
-                    .SetBasePath(Directory.GetCurrentDirectory())
+                    .SetBasePath(AppContext.BaseDirectory)
                     .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
 
                 // Try to find appsettings.json in parent directories if not found in current directory
-                string? directory = Directory.GetCurrentDirectory();
+                string? directory = AppContext.BaseDirectory;
                 while (directory != null && !File.Exists(Path.Combine(directory, "appsettings.json")))
                 {
                     directory = Directory.GetParent(directory)?.FullName;
