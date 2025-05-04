@@ -14,7 +14,7 @@ namespace prjBuildApp.Services
         private readonly FileSystemService _fileSystemService;
         private readonly Models.Configuration.Settings _settings;
         private readonly List<ProjectInfo> _selectedProjects = new();
-        private bool _showArchivedProjects = false;
+        private bool _showArchivedOrExcludedProjects = false;
 
         public CommandLineUIService(
             LoggingService loggingService,
@@ -79,7 +79,7 @@ namespace prjBuildApp.Services
                         }
                         break;
                     case "6":
-                        ToggleArchivedProjectsDisplay();
+                        ToggleArchivedOrExcludedProjectsDisplay();
                         break;
                     case "7":
                     case "q":
@@ -104,21 +104,134 @@ namespace prjBuildApp.Services
 
             // Display all projects with selection status
             var allProjects = _projectManagementService.Solutions
-                .SelectMany(s => s.Projects.Where(p => !s.AreAllArchivesExisting || _showArchivedProjects))
-                .OrderBy(p => p.Solution.Name)
-                .ThenBy(p => p.Name)
+                .SelectMany(s => s.Projects.Where(p =>
+                    // Show only non-archived projects or all projects if _showArchivedOrExcludedProjects is true
+                    (!s.AreAllArchivesExisting || _showArchivedOrExcludedProjects) &&
+                    // Hide projects where ExcludeFromArchiving is true unless _showArchivedOrExcludedProjects is true
+                    (p.ExcludeFromArchiving != true || _showArchivedOrExcludedProjects)))
+                .OrderBy(p => p.Solution.Name, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
             Console.WriteLine("Projects:");
             for (int i = 0; i < allProjects.Count; i++)
             {
                 var project = allProjects[i];
+
+                // Format the number based on total count
+                string numberFormat;
+                if (allProjects.Count < 10)
+                    numberFormat = $"{i + 1}.";
+                else if (allProjects.Count < 100)
+                    numberFormat = $"{i + 1,2}.";
+                else if (allProjects.Count < 1000)
+                    numberFormat = $"{i + 1,3}.";
+                else
+                    numberFormat = $"{i + 1,4}.";
+
                 string selectionStatus = _selectedProjects.Contains(project) ? "[X]" : "[ ]";
-                string archiveStatus = project.Solution.AreAllArchivesExisting ? "[Archived]" : "[Not Archived]";
-                string archiveNeededStatus = project.ExcludeFromArchiving == true ? "[Excluded From Archiving]" : "[Will Be Archived]";
-                string versionStatus = project.ValidateVersions() ? "[Versions OK]" : "[Version Mismatch]";
-                string runtimeStatus = project.SupportedRuntimes.Count > 0 ? $"[Runtimes: {project.SupportedRuntimes.Count}]" : "[No Runtimes]";
-                Console.WriteLine($"{i + 1}. {selectionStatus} {archiveStatus} {archiveNeededStatus} {versionStatus} {runtimeStatus} {project.Solution.Name} / {project.Name}");
+
+                // Save the current console color
+                ConsoleColor originalColor = Console.ForegroundColor;
+
+                // Default view - simplified
+                if (!_showArchivedOrExcludedProjects)
+                {
+                    // Write the basic information first
+                    Console.Write($"{numberFormat} {selectionStatus} {project.Solution.Name} / {project.Name}");
+
+                    // Collect problem messages
+                    List<string> problems = new List<string>();
+                    if (!project.ValidateVersions())
+                    {
+                        problems.Add("Version Mismatch");
+                    }
+
+                    if (project.SupportedRuntimes.Count == 0)
+                    {
+                        problems.Add("No Runtimes");
+                    }
+
+                    // Display problems if any exist
+                    if (problems.Count > 0)
+                    {
+                        Console.Write(" ");
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.Write($"({string.Join("; ", problems)})");
+                        Console.ForegroundColor = originalColor;
+                    }
+
+                    // End the line
+                    Console.WriteLine();
+                }
+                // Detailed view when toggle is on - without brackets
+                else
+                {
+                    // Write the basic information first
+                    Console.Write($"{numberFormat} {selectionStatus} {project.Solution.Name} / {project.Name}");
+
+                    // Display all statuses with appropriate colors
+                    Console.Write(" (");
+
+                    // Archive status
+                    if (project.Solution.AreAllArchivesExisting)
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkYellow;
+                        Console.Write("Archived");
+                        Console.ForegroundColor = originalColor;
+                    }
+                    else
+                    {
+                        Console.Write("Not archived");
+                    }
+
+                    Console.Write("; ");
+
+                    // Archive needed status
+                    if (project.ExcludeFromArchiving == true)
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkYellow;
+                        Console.Write("Excluded from archiving");
+                        Console.ForegroundColor = originalColor;
+                    }
+                    else
+                    {
+                        Console.Write("Will be archived");
+                    }
+
+                    Console.Write("; ");
+
+                    // Version status
+                    if (!project.ValidateVersions())
+                    {
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.Write("Version mismatch");
+                        Console.ForegroundColor = originalColor;
+                    }
+                    else
+                    {
+                        Console.Write("Versions OK");
+                    }
+
+                    Console.Write("; ");
+
+                    // Runtime status
+                    if (project.SupportedRuntimes.Count == 0)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.Write("No runtimes");
+                        Console.ForegroundColor = originalColor;
+                    }
+                    else
+                    {
+                        Console.Write($"Runtimes: {project.SupportedRuntimes.Count}");
+                    }
+
+                    Console.Write(")");
+
+                    // End the line
+                    Console.WriteLine();
+                }
             }
 
             Console.WriteLine();
@@ -128,7 +241,7 @@ namespace prjBuildApp.Services
             Console.WriteLine("3. Select all projects");
             Console.WriteLine("4. Deselect all projects");
             Console.WriteLine("5. Operations menu");
-            Console.WriteLine($"6. {(_showArchivedProjects ? "Hide" : "Show")} archived projects");
+            Console.WriteLine($"6. {(_showArchivedOrExcludedProjects ? "Simple view" : "Detailed view")}");
             Console.WriteLine("7. Exit");
             Console.WriteLine();
         }
@@ -136,9 +249,13 @@ namespace prjBuildApp.Services
         private void SelectProject()
         {
             var allProjects = _projectManagementService.Solutions
-                .SelectMany(s => s.Projects.Where(p => !s.AreAllArchivesExisting || _showArchivedProjects))
-                .OrderBy(p => p.Solution.Name)
-                .ThenBy(p => p.Name)
+                .SelectMany(s => s.Projects.Where(p =>
+                    // Show only non-archived projects or all projects if _showArchivedOrExcludedProjects is true
+                    (!s.AreAllArchivesExisting || _showArchivedOrExcludedProjects) &&
+                    // Hide projects where ExcludeFromArchiving is true unless _showArchivedOrExcludedProjects is true
+                    (p.ExcludeFromArchiving != true || _showArchivedOrExcludedProjects)))
+                .OrderBy(p => p.Solution.Name, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
             Console.Write("Enter project number to select: ");
@@ -203,7 +320,11 @@ namespace prjBuildApp.Services
 
             foreach (var solution in _projectManagementService.Solutions)
             {
-                foreach (var project in solution.Projects.Where(p => !solution.AreAllArchivesExisting || _showArchivedProjects))
+                foreach (var project in solution.Projects.Where(p =>
+                    // Show only non-archived projects or all projects if _showArchivedOrExcludedProjects is true
+                    (!solution.AreAllArchivesExisting || _showArchivedOrExcludedProjects) &&
+                    // Hide projects where ExcludeFromArchiving is true unless _showArchivedOrExcludedProjects is true
+                    (p.ExcludeFromArchiving != true || _showArchivedOrExcludedProjects)))
                 {
                     _selectedProjects.Add(project);
                 }
@@ -224,10 +345,10 @@ namespace prjBuildApp.Services
             Console.ReadKey();
         }
 
-        private void ToggleArchivedProjectsDisplay()
+        private void ToggleArchivedOrExcludedProjectsDisplay()
         {
-            _showArchivedProjects = !_showArchivedProjects;
-            _loggingService.Information("{Action} archived projects", _showArchivedProjects ? "Showing" : "Hiding");
+            _showArchivedOrExcludedProjects = !_showArchivedOrExcludedProjects;
+            _loggingService.Information("Switched to {ViewType} view", _showArchivedOrExcludedProjects ? "detailed" : "simple");
             Console.WriteLine("Press any key to continue...");
             Console.ReadKey();
         }
@@ -244,21 +365,133 @@ namespace prjBuildApp.Services
                 Console.WriteLine($"Selected projects: {_selectedProjects.Count}");
 
                 // Group projects by solution
-                var projectsBySolution = _selectedProjects.GroupBy(p => p.Solution);
+                var projectsBySolution = _selectedProjects
+                    .GroupBy(p => p.Solution)
+                    .OrderBy(g => g.Key.Name, StringComparer.OrdinalIgnoreCase);
 
                 foreach (var solutionGroup in projectsBySolution)
                 {
                     var solution = solutionGroup.Key;
-                    string solutionVersionStatus = solution.ValidateVersions() ? "[Solution Versions OK]" : "[Solution Version Mismatch]";
-                    Console.WriteLine($"Solution: {solution.Name} {solutionVersionStatus}");
+                    ConsoleColor originalSolutionColor = Console.ForegroundColor;
+
+                    // Write solution name
+                    Console.Write($"Solution: {solution.Name}");
+
+                    // Add solution version problem if exists
+                    if (!solution.ValidateVersions())
+                    {
+                        Console.Write(" ");
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.Write("(Solution version mismatch)");
+                        Console.ForegroundColor = originalSolutionColor;
+                    }
+
+                    Console.WriteLine();
 
                     foreach (var project in solutionGroup)
                     {
-                        string archiveStatus = project.Solution.AreAllArchivesExisting ? "[Archived]" : "[Not Archived]";
-                        string archiveNeededStatus = project.ExcludeFromArchiving == true ? "[Excluded From Archiving]" : "[Will Be Archived]";
-                        string versionStatus = project.ValidateVersions() ? "[Versions OK]" : "[Version Mismatch]";
-                        string runtimeStatus = project.SupportedRuntimes.Count > 0 ? $"[Runtimes: {project.SupportedRuntimes.Count}]" : "[No Runtimes]";
-                        Console.WriteLine($"  - {archiveStatus} {archiveNeededStatus} {versionStatus} {runtimeStatus} {project.Name}");
+                        // Save the current console color
+                        ConsoleColor originalColor = Console.ForegroundColor;
+
+                        // Default view - simplified
+                        if (!_showArchivedOrExcludedProjects)
+                        {
+                            // Write the project name
+                            Console.Write($"  - {project.Name}");
+
+                            // Collect problem messages
+                            List<string> problems = new List<string>();
+                            if (!project.ValidateVersions())
+                            {
+                                problems.Add("Version Mismatch");
+                            }
+
+                            if (project.SupportedRuntimes.Count == 0)
+                            {
+                                problems.Add("No Runtimes");
+                            }
+
+                            // Display problems if any exist
+                            if (problems.Count > 0)
+                            {
+                                Console.Write(" ");
+                                Console.ForegroundColor = ConsoleColor.Red;
+                                Console.Write($"({string.Join("; ", problems)})");
+                                Console.ForegroundColor = originalColor;
+                            }
+
+                            // End the line
+                            Console.WriteLine();
+                        }
+                        // Detailed view when toggle is on
+                        else
+                        {
+                            // Write the basic information first
+                            Console.Write("  - ");
+                            Console.Write($"{project.Name}");
+
+                            // Display all statuses with appropriate colors
+                            Console.Write(" (");
+
+                            // Archive status
+                            if (project.Solution.AreAllArchivesExisting)
+                            {
+                                Console.ForegroundColor = ConsoleColor.DarkYellow;
+                                Console.Write("Archived");
+                                Console.ForegroundColor = originalColor;
+                            }
+                            else
+                            {
+                                Console.Write("Not archived");
+                            }
+
+                            Console.Write("; ");
+
+                            // Archive needed status
+                            if (project.ExcludeFromArchiving == true)
+                            {
+                                Console.ForegroundColor = ConsoleColor.DarkYellow;
+                                Console.Write("Excluded from archiving");
+                                Console.ForegroundColor = originalColor;
+                            }
+                            else
+                            {
+                                Console.Write("Will be archived");
+                            }
+
+                            Console.Write("; ");
+
+                            // Version status
+                            if (!project.ValidateVersions())
+                            {
+                                Console.ForegroundColor = ConsoleColor.Red;
+                                Console.Write("Version mismatch");
+                                Console.ForegroundColor = originalColor;
+                            }
+                            else
+                            {
+                                Console.Write("Versions OK");
+                            }
+
+                            Console.Write("; ");
+
+                            // Runtime status
+                            if (project.SupportedRuntimes.Count == 0)
+                            {
+                                Console.ForegroundColor = ConsoleColor.Red;
+                                Console.Write("No runtimes");
+                                Console.ForegroundColor = originalColor;
+                            }
+                            else
+                            {
+                                Console.Write($"Runtimes: {project.SupportedRuntimes.Count}");
+                            }
+
+                            Console.Write(")");
+
+                            // End the line
+                            Console.WriteLine();
+                        }
                     }
                     Console.WriteLine();
                 }
@@ -442,6 +675,7 @@ namespace prjBuildApp.Services
             var solutions = _selectedProjects
                 .Select(p => p.Solution)
                 .Distinct()
+                .OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
             if (solutions.Count == 0)
