@@ -30,11 +30,6 @@ namespace prjBuildApp.Models.Project
         public Dictionary<string, string> RuntimeArchivePaths { get; }
 
         /// <summary>
-        /// Indicates if the project has been archived (all archives exist)
-        /// </summary>
-        public bool IsArchived { get; set; }
-
-        /// <summary>
         /// Initializes inherited properties from global settings, solution configuration, and project configuration
         /// </summary>
         /// <param name="globalSettings">Global application settings</param>

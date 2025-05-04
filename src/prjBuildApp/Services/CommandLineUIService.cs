@@ -104,7 +104,7 @@ namespace prjBuildApp.Services
 
             // Display all projects with selection status
             var allProjects = _projectManagementService.Solutions
-                .SelectMany(s => s.Projects.Where(p => !p.IsArchived || _showArchivedProjects))
+                .SelectMany(s => s.Projects.Where(p => !s.IsArchived || _showArchivedProjects))
                 .OrderBy(p => p.Solution.Name)
                 .ThenBy(p => p.Name)
                 .ToList();
@@ -114,7 +114,7 @@ namespace prjBuildApp.Services
             {
                 var project = allProjects[i];
                 string selectionStatus = _selectedProjects.Contains(project) ? "[X]" : "[ ]";
-                string archiveStatus = project.IsArchived ? "[Archived]" : "[Not Archived]";
+                string archiveStatus = project.Solution.IsArchived ? "[Archived]" : "[Not Archived]";
                 string versionStatus = project.ValidateVersions() ? "[Versions OK]" : "[Version Mismatch]";
                 string runtimeStatus = project.SupportedRuntimes.Count > 0 ? $"[Runtimes: {project.SupportedRuntimes.Count}]" : "[No Runtimes]";
                 Console.WriteLine($"{i + 1}. {selectionStatus} {archiveStatus} {versionStatus} {runtimeStatus} {project.Solution.Name} / {project.Name}");
@@ -135,7 +135,7 @@ namespace prjBuildApp.Services
         private void SelectProject()
         {
             var allProjects = _projectManagementService.Solutions
-                .SelectMany(s => s.Projects.Where(p => !p.IsArchived || _showArchivedProjects))
+                .SelectMany(s => s.Projects.Where(p => !s.IsArchived || _showArchivedProjects))
                 .OrderBy(p => p.Solution.Name)
                 .ThenBy(p => p.Name)
                 .ToList();
@@ -202,7 +202,7 @@ namespace prjBuildApp.Services
 
             foreach (var solution in _projectManagementService.Solutions)
             {
-                foreach (var project in solution.Projects.Where(p => !p.IsArchived || _showArchivedProjects))
+                foreach (var project in solution.Projects.Where(p => !solution.IsArchived || _showArchivedProjects))
                 {
                     _selectedProjects.Add(project);
                 }
@@ -253,7 +253,7 @@ namespace prjBuildApp.Services
 
                     foreach (var project in solutionGroup)
                     {
-                        string archiveStatus = project.IsArchived ? "[Archived]" : "[Not Archived]";
+                        string archiveStatus = project.Solution.IsArchived ? "[Archived]" : "[Not Archived]";
                         string versionStatus = project.ValidateVersions() ? "[Versions OK]" : "[Version Mismatch]";
                         string runtimeStatus = project.SupportedRuntimes.Count > 0 ? $"[Runtimes: {project.SupportedRuntimes.Count}]" : "[No Runtimes]";
                         Console.WriteLine($"  - {archiveStatus} {versionStatus} {runtimeStatus} {project.Name}");
@@ -411,9 +411,10 @@ namespace prjBuildApp.Services
                     _loggingService.Debug("Archive output: {Line}", line);
                 }
 
-                // Update archive status
-                project.IsArchived = _fileSystemService.AreAllArchivesExisting(project);
-                if (project.IsArchived)
+                // Update solution archive status if needed
+                bool archivesExist = _fileSystemService.AreAllArchivesExisting(project.Solution);
+                project.Solution.IsArchived = archivesExist;
+                if (archivesExist)
                 {
                     _loggingService.Information("Project {ProjectName} has been successfully archived", project.Name);
                 }

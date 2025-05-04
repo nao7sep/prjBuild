@@ -54,6 +54,7 @@ namespace prjBuildApp.Services
                         _loggingService.Information("Found solution: {SolutionName} at {SolutionFile}", solutionName, solutionFile);
 
                         var solution = new SolutionInfo(solutionName, directory, solutionFile);
+                        _solutions.Add(solution);
 
                         // Initialize inherited properties from configuration
                         var solutionConfig = _settings.Solutions.FirstOrDefault(s => s.Name == solutionName);
@@ -71,8 +72,6 @@ namespace prjBuildApp.Services
                         solution.SourceArchivePath = sourceArchivePath;
                         _loggingService.Debug("Solution source archive path: {SourceArchivePath}", solution.SourceArchivePath);
 
-                        _solutions.Add(solution);
-
                         // Discover projects in the solution
                         DiscoverProjects(solution);
 
@@ -85,14 +84,24 @@ namespace prjBuildApp.Services
                         {
                             _loggingService.Information("Solution {SolutionName} has consistent versions across all projects", solution.Name);
                         }
+
+                        // Check if all archives for this solution exist
+                        solution.IsArchived = _fileSystemService.AreAllArchivesExisting(solution);
+
+                        if (solution.IsArchived)
+                        {
+                            _loggingService.Debug("Solution {SolutionName} is already archived", solution.Name);
+                        }
+                        else
+                        {
+                            _loggingService.Debug("Solution {SolutionName} needs to be archived", solution.Name);
+                        }
                     }
                 }
             }
 
             _loggingService.Information("Discovered {SolutionCount} solutions with {ProjectCount} projects",
                 _solutions.Count, _solutions.Sum(s => s.Projects.Count));
-
-            // Archive status is already checked during project discovery
         }
 
 
@@ -115,6 +124,10 @@ namespace prjBuildApp.Services
                 _loggingService.Information("Found project: {ProjectName} at {ProjectFile}", projectName, projectFile);
 
                 var project = new ProjectInfo(solution, projectName, projectDirectory, projectFile);
+                solution.Projects.Add(project);
+
+                // Extract version information
+                ExtractVersionInfo(project);
 
                 // Initialize inherited properties from configuration
                 var solutionConfig = _settings.Solutions.FirstOrDefault(s => s.Name == solution.Name);
@@ -135,11 +148,6 @@ namespace prjBuildApp.Services
                         runtime, archivePaths[runtime]);
                 }
 
-                solution.Projects.Add(project);
-
-                // Extract version information
-                ExtractVersionInfo(project);
-
                 // Check if all versions within the project match
                 if (!project.ValidateVersions())
                 {
@@ -159,18 +167,6 @@ namespace prjBuildApp.Services
                 {
                     _loggingService.Information("Project {ProjectName} has {RuntimeCount} supported runtime(s): {Runtimes}",
                         project.Name, project.SupportedRuntimes.Count, string.Join(", ", project.SupportedRuntimes));
-                }
-
-                // Check if all archives for this project exist
-                project.IsArchived = _fileSystemService.AreAllArchivesExisting(project);
-
-                if (project.IsArchived)
-                {
-                    _loggingService.Debug("Project {ProjectName} is already archived", project.Name);
-                }
-                else
-                {
-                    _loggingService.Debug("Project {ProjectName} needs to be archived", project.Name);
                 }
             }
         }

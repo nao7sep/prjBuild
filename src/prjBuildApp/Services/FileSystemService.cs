@@ -83,7 +83,8 @@ namespace prjBuildApp.Services
             }
         }
 
-        public bool CreateZipArchive(string sourceDirectory, string destinationArchiveFile)
+        public bool CreateZipArchive(string sourceDirectory, string destinationArchiveFile,
+            List<string>? ignoredObjectNames = null, List<string>? ignoredObjectRelativePaths = null)
         {
             try
             {
@@ -98,9 +99,45 @@ namespace prjBuildApp.Services
                 using (var archive = ZipFile.Open(destinationArchiveFile, ZipArchiveMode.Create))
                 {
                     // Get all files in the source directory (recursively)
-                    var files = Directory.GetFiles(sourceDirectory, "*", SearchOption.AllDirectories);
+                    var allFiles = Directory.GetFiles(sourceDirectory, "*", SearchOption.AllDirectories);
+                    var filesToArchive = new List<string>();
 
-                    foreach (var file in files)
+                    // Filter out ignored files
+                    foreach (var file in allFiles)
+                    {
+                        string fileName = Path.GetFileName(file);
+                        string relativePath = Path.GetRelativePath(sourceDirectory, file);
+
+                        bool shouldIgnore = false;
+
+                        // Check if file name is in the ignored names list
+                        if (ignoredObjectNames != null && ignoredObjectNames.Contains(fileName, StringComparer.OrdinalIgnoreCase))
+                        {
+                            _loggingService.Debug("Ignoring {Path} because its name is in the ignore list", file);
+                            shouldIgnore = true;
+                        }
+
+                        // Check if relative path contains any ignored path patterns
+                        if (!shouldIgnore && ignoredObjectRelativePaths != null)
+                        {
+                            foreach (var ignoredPath in ignoredObjectRelativePaths)
+                            {
+                                if (relativePath.Contains(ignoredPath, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    _loggingService.Debug("Ignoring {Path} because its relative path contains a pattern in the ignore list", file);
+                                    shouldIgnore = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (!shouldIgnore)
+                        {
+                            filesToArchive.Add(file);
+                        }
+                    }
+
+                    foreach (var file in filesToArchive)
                     {
                         // Use the relative path without the base directory
                         string entryName = Path.GetRelativePath(sourceDirectory, file);
@@ -155,24 +192,27 @@ namespace prjBuildApp.Services
         }
 
         /// <summary>
-        /// Checks if all archives for a project exist
+        /// Checks if all archives for a solution exist (source code and all project binaries)
         /// </summary>
-        /// <param name="project">The project to check</param>
+        /// <param name="solution">The solution to check</param>
         /// <returns>True if all archives exist, false otherwise</returns>
-        public bool AreAllArchivesExisting(ProjectInfo project)
+        public bool AreAllArchivesExisting(SolutionInfo solution)
         {
             // Check if solution source archive exists
-            if (!File.Exists(project.Solution.SourceArchivePath))
+            if (!File.Exists(solution.SourceArchivePath))
             {
                 return false;
             }
 
-            // Check all binary archives in the RuntimeArchivePaths dictionary
-            foreach (var archivePath in project.RuntimeArchivePaths.Values)
+            // Check all binary archives for all projects in the solution
+            foreach (var project in solution.Projects)
             {
-                if (!File.Exists(archivePath))
+                foreach (var archivePath in project.RuntimeArchivePaths.Values)
                 {
-                    return false;
+                    if (!File.Exists(archivePath))
+                    {
+                        return false;
+                    }
                 }
             }
 

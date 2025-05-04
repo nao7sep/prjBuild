@@ -12,6 +12,7 @@ namespace prjBuildApp.Models.Project
             FilePath = filePath;
             SourceArchivePath = string.Empty;
             ArchiveDirectoryPath = string.Empty;
+            IsArchived = false;
         }
 
         public string Name { get; }
@@ -28,6 +29,11 @@ namespace prjBuildApp.Models.Project
         /// Path to the source code archive file
         /// </summary>
         public string SourceArchivePath { get; set; }
+
+        /// <summary>
+        /// Indicates if the solution has been archived (source code and all project binaries exist)
+        /// </summary>
+        public bool IsArchived { get; set; }
 
         /// <summary>
         /// Initializes inherited properties from global settings and solution configuration
