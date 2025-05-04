@@ -205,7 +205,7 @@ namespace prjBuildApp.Services
                     {
                         try
                         {
-                            // Use our new formatting method to get "v{major}.{minor}"
+                            // Use our formatting method to get version in the appropriate format
                             string formattedVersion = VersionManager.FormatVersion(primaryVersionSource.ParsedVersion);
                             _loggingService.Debug("Using formatted version {Version} from project {ProjectName} for solution archive",
                                 formattedVersion, project.Name);

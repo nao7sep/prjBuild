@@ -75,6 +75,16 @@ namespace prjBuildApp.Services
 
                         // Discover projects in the solution
                         DiscoverProjects(solution);
+
+                        // Validate versions across all projects in the solution
+                        if (!solution.ValidateVersions())
+                        {
+                            _loggingService.Warning("Solution {SolutionName} has projects with mismatched versions", solution.Name);
+                        }
+                        else
+                        {
+                            _loggingService.Information("Solution {SolutionName} has consistent versions across all projects", solution.Name);
+                        }
                     }
                 }
             }
@@ -129,6 +139,27 @@ namespace prjBuildApp.Services
 
                 // Extract version information
                 ExtractVersionInfo(project);
+
+                // Check if all versions within the project match
+                if (!project.ValidateVersions())
+                {
+                    _loggingService.Warning("Project {ProjectName} has mismatched versions", project.Name);
+                }
+                else if (project.VersionManager.VersionSources.Count > 0)
+                {
+                    _loggingService.Information("Project {ProjectName} has consistent versions", project.Name);
+                }
+
+                // Check if the project has at least one supported runtime
+                if (project.SupportedRuntimes.Count == 0)
+                {
+                    _loggingService.Warning("Project {ProjectName} has no supported runtimes defined", project.Name);
+                }
+                else
+                {
+                    _loggingService.Information("Project {ProjectName} has {RuntimeCount} supported runtime(s): {Runtimes}",
+                        project.Name, project.SupportedRuntimes.Count, string.Join(", ", project.SupportedRuntimes));
+                }
 
                 // Check if all archives for this project exist
                 project.IsArchived = _fileSystemService.AreAllArchivesExisting(project);

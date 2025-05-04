@@ -68,7 +68,7 @@ namespace prjBuildApp.Models.Project
         /// Validates that all version sources within this project have the same version
         /// </summary>
         /// <returns>True if all versions match, false otherwise</returns>
-        public bool ValidateVersions()
+        public bool ValidateProjectVersions()
         {
             if (VersionSources.Count == 0)
                 return false;
@@ -91,7 +91,7 @@ namespace prjBuildApp.Models.Project
         /// </summary>
         /// <param name="solution">The solution containing projects to validate</param>
         /// <returns>True if all projects have the same primary version, false otherwise</returns>
-        public static bool ValidateSolutionVersions(SolutionInfo solution)
+        public static bool ValidateSolutionAndProjectVersions(SolutionInfo solution)
         {
             if (solution.Projects.Count == 0)
                 return false;
@@ -133,10 +133,13 @@ namespace prjBuildApp.Models.Project
         }
 
         /// <summary>
-        /// Converts a Version object to a string in the format "v{major}.{minor}"
+        /// Converts a Version object to a formatted string according to these rules:
+        /// 1. Always displays Major and Minor (first 2 fields)
+        /// 2. If Build (3rd field) is not 0, it is displayed
+        /// 3. If Revision (4th field) is not 0, both Build and Revision are displayed regardless of Build's value
         /// </summary>
         /// <param name="version">The Version object to convert</param>
-        /// <returns>A string representation of the version in the format "v{major}.{minor}"</returns>
+        /// <returns>A string representation of the version in the format "v{major}.{minor}[.{build}[.{revision}]]"</returns>
         /// <exception cref="ArgumentNullException">Thrown when the version is null</exception>
         public static string FormatVersion(Version version)
         {
@@ -145,23 +148,21 @@ namespace prjBuildApp.Models.Project
                 throw new ArgumentNullException(nameof(version), "Version cannot be null");
             }
 
-            return $"v{version.Major}.{version.Minor}";
-        }
+            // Always display Major and Minor
+            string formattedVersion = $"v{version.Major}.{version.Minor}";
 
-        /// <summary>
-        /// Gets the formatted version string from the primary version source
-        /// </summary>
-        /// <returns>A formatted version string in the format "v{major}.{minor}", or throws an exception if no valid version exists</returns>
-        /// <exception cref="InvalidOperationException">Thrown when no valid version source exists</exception>
-        public string GetFormattedVersion()
-        {
-            var primarySource = GetPrimaryVersionSource();
-            if (primarySource?.ParsedVersion == null)
+            // If Revision (4th field) is not 0, display both Build and Revision
+            if (version.Revision != 0)
             {
-                throw new InvalidOperationException("No valid version information available");
+                formattedVersion = $"{formattedVersion}.{version.Build}.{version.Revision}";
+            }
+            // If only Build (3rd field) is not 0, display just the Build
+            else if (version.Build != 0)
+            {
+                formattedVersion = $"{formattedVersion}.{version.Build}";
             }
 
-            return FormatVersion(primarySource.ParsedVersion);
+            return formattedVersion;
         }
     }
 }

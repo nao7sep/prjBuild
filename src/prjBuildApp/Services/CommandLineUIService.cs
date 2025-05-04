@@ -115,7 +115,9 @@ namespace prjBuildApp.Services
                 var project = allProjects[i];
                 string selectionStatus = _selectedProjects.Contains(project) ? "[X]" : "[ ]";
                 string archiveStatus = project.IsArchived ? "[Archived]" : "[Not Archived]";
-                Console.WriteLine($"{i + 1}. {selectionStatus} {archiveStatus} {project.Solution.Name} / {project.Name}");
+                string versionStatus = project.ValidateVersions() ? "[Versions OK]" : "[Version Mismatch]";
+                string runtimeStatus = project.SupportedRuntimes.Count > 0 ? $"[Runtimes: {project.SupportedRuntimes.Count}]" : "[No Runtimes]";
+                Console.WriteLine($"{i + 1}. {selectionStatus} {archiveStatus} {versionStatus} {runtimeStatus} {project.Solution.Name} / {project.Name}");
             }
 
             Console.WriteLine();
@@ -239,10 +241,24 @@ namespace prjBuildApp.Services
                 Console.WriteLine();
 
                 Console.WriteLine($"Selected projects: {_selectedProjects.Count}");
-                foreach (var project in _selectedProjects)
+
+                // Group projects by solution
+                var projectsBySolution = _selectedProjects.GroupBy(p => p.Solution);
+
+                foreach (var solutionGroup in projectsBySolution)
                 {
-                    string archiveStatus = project.IsArchived ? "[Archived]" : "[Not Archived]";
-                    Console.WriteLine($"- {archiveStatus} {project.Solution.Name} / {project.Name}");
+                    var solution = solutionGroup.Key;
+                    string solutionVersionStatus = solution.ValidateVersions() ? "[Solution Versions OK]" : "[Solution Version Mismatch]";
+                    Console.WriteLine($"Solution: {solution.Name} {solutionVersionStatus}");
+
+                    foreach (var project in solutionGroup)
+                    {
+                        string archiveStatus = project.IsArchived ? "[Archived]" : "[Not Archived]";
+                        string versionStatus = project.ValidateVersions() ? "[Versions OK]" : "[Version Mismatch]";
+                        string runtimeStatus = project.SupportedRuntimes.Count > 0 ? $"[Runtimes: {project.SupportedRuntimes.Count}]" : "[No Runtimes]";
+                        Console.WriteLine($"  - {archiveStatus} {versionStatus} {runtimeStatus} {project.Name}");
+                    }
+                    Console.WriteLine();
                 }
 
                 Console.WriteLine();

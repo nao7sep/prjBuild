@@ -70,7 +70,7 @@ namespace prjBuildApp.Models.Project
         /// <returns>True if all projects have the same primary version, false otherwise</returns>
         public bool ValidateVersions()
         {
-            return VersionManager.ValidateSolutionVersions(this);
+            return VersionManager.ValidateSolutionAndProjectVersions(this);
         }
     }
 }

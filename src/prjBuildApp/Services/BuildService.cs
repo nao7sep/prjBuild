@@ -93,9 +93,57 @@ namespace prjBuildApp.Services
             return output;
         }
 
+        /// <summary>
+        /// Checks if a project can be built based on its validation status
+        /// </summary>
+        /// <param name="project">The project to check</param>
+        /// <param name="runtime">The runtime to build for, if specified</param>
+        /// <returns>A tuple containing a boolean indicating if the project can be built and a list of validation messages</returns>
+        public (bool CanBuild, List<string> ValidationMessages) ValidateProjectForBuild(ProjectInfo project, string? runtime = null)
+        {
+            var messages = new List<string>();
+            bool canBuild = true;
+
+            // Check if versions match within the project
+            if (!project.ValidateVersions())
+            {
+                messages.Add($"Project {project.Name} has mismatched versions");
+                canBuild = false;
+            }
+
+            // Check if the project has supported runtimes
+            if (project.SupportedRuntimes.Count == 0)
+            {
+                messages.Add($"Project {project.Name} has no supported runtimes defined");
+                canBuild = false;
+            }
+
+            // If a specific runtime is provided, check if it's supported
+            if (!string.IsNullOrEmpty(runtime) && !project.SupportedRuntimes.Contains(runtime))
+            {
+                messages.Add($"Runtime {runtime} is not supported by project {project.Name}");
+                canBuild = false;
+            }
+
+            return (canBuild, messages);
+        }
+
         public List<string> BuildProject(ProjectInfo project, string? runtime = null, bool noRestore = false)
         {
             var output = new List<string>();
+
+            // Validate the project before building
+            var (canBuild, validationMessages) = ValidateProjectForBuild(project, runtime);
+
+            // Add validation messages to output
+            output.AddRange(validationMessages);
+
+            // If the project can't be built, return early with validation messages
+            if (!canBuild)
+            {
+                _loggingService.Warning("Cannot build project {ProjectName} due to validation failures", project.Name);
+                return output;
+            }
 
             try
             {
@@ -139,6 +187,19 @@ namespace prjBuildApp.Services
         public List<string> PublishProject(ProjectInfo project, string outputDirectory, string? runtime = null)
         {
             var output = new List<string>();
+
+            // Validate the project before publishing
+            var (canBuild, validationMessages) = ValidateProjectForBuild(project, runtime);
+
+            // Add validation messages to output
+            output.AddRange(validationMessages);
+
+            // If the project can't be published, return early with validation messages
+            if (!canBuild)
+            {
+                _loggingService.Warning("Cannot publish project {ProjectName} due to validation failures", project.Name);
+                return output;
+            }
 
             try
             {
@@ -237,6 +298,20 @@ namespace prjBuildApp.Services
         {
             var output = new List<string>();
 
+            // Validate the project before archiving
+            // We'll check each runtime individually later, so we don't pass a specific runtime here
+            var (canBuild, validationMessages) = ValidateProjectForBuild(project);
+
+            // Add validation messages to output
+            output.AddRange(validationMessages);
+
+            // If the project can't be archived, return early with validation messages
+            if (!canBuild)
+            {
+                _loggingService.Warning("Cannot archive project {ProjectName} due to validation failures", project.Name);
+                return output;
+            }
+
             try
             {
                 _loggingService.Information("Archiving project {ProjectName}", project.Name);
@@ -250,6 +325,17 @@ namespace prjBuildApp.Services
                 // Archive binaries for each supported runtime
                 foreach (var runtime in supportedRuntimes)
                 {
+                    // Validate this specific runtime
+                    var (canBuildRuntime, runtimeValidationMessages) = ValidateProjectForBuild(project, runtime);
+
+                    if (!canBuildRuntime)
+                    {
+                        output.AddRange(runtimeValidationMessages);
+                        _loggingService.Warning("Skipping runtime {Runtime} for project {ProjectName} due to validation failures",
+                            runtime, project.Name);
+                        continue;
+                    }
+
                     // Build the project for this runtime with noRestore=true for efficiency
                     var buildOutput = BuildProject(project, runtime, true);
                     output.AddRange(buildOutput);
@@ -301,6 +387,27 @@ namespace prjBuildApp.Services
         public List<string> ArchiveSolution(SolutionInfo solution)
         {
             var output = new List<string>();
+
+            // Validate that all projects in the solution have consistent versions
+            if (!solution.ValidateVersions())
+            {
+                output.Add($"Solution {solution.Name} has projects with mismatched versions");
+                _loggingService.Warning("Cannot archive solution {SolutionName} due to version mismatches between projects", solution.Name);
+                return output;
+            }
+
+            // Check if any projects in the solution have no supported runtimes
+            var projectsWithNoRuntimes = solution.Projects.Where(p => p.SupportedRuntimes.Count == 0).ToList();
+            if (projectsWithNoRuntimes.Any())
+            {
+                output.Add($"Solution {solution.Name} has {projectsWithNoRuntimes.Count} projects with no supported runtimes:");
+                foreach (var project in projectsWithNoRuntimes)
+                {
+                    output.Add($"- {project.Name}");
+                }
+                _loggingService.Warning("Cannot archive solution {SolutionName} due to projects with no supported runtimes", solution.Name);
+                return output;
+            }
 
             try
             {

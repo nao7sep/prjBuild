@@ -48,11 +48,7 @@ namespace prjBuildApp.Models.Project
             {
                 SupportedRuntimes.AddRange(projectConfig.SupportedRuntimes);
             }
-            else
-            {
-                // Default to win-x64 if not specified
-                SupportedRuntimes.Add("win-x64");
-            }
+            // No fallback to win-x64 - if no runtimes are specified, the list remains empty
 
             // Merge ignore lists from all three levels: global, solution, and project
             IgnoredObjectNames.Clear();
@@ -98,7 +94,7 @@ namespace prjBuildApp.Models.Project
         /// <returns>True if all versions match, false otherwise</returns>
         public bool ValidateVersions()
         {
-            return VersionManager.ValidateVersions();
+            return VersionManager.ValidateProjectVersions();
         }
     }
 }
