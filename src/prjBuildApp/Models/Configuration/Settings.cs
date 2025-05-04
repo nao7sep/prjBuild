@@ -39,5 +39,8 @@ namespace prjBuildApp.Models.Configuration
         // Project-specific ignore patterns
         public List<string> IgnoredObjectNames { get; set; } = new();
         public List<string> IgnoredObjectRelativePaths { get; set; } = new();
+
+        // Archiving configuration
+        public bool? ExcludeFromArchiving { get; set; } = null; // Default to null (will be archived)
     }
 }

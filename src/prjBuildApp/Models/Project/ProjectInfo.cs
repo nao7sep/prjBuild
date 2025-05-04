@@ -14,6 +14,7 @@ namespace prjBuildApp.Models.Project
             VersionManager = new VersionManager();
             ReferencedProjects = new List<ProjectInfo>();
             RuntimeArchivePaths = new Dictionary<string, string>();
+            ExcludeFromArchiving = null;
         }
 
         public SolutionInfo Solution { get; }
@@ -28,6 +29,12 @@ namespace prjBuildApp.Models.Project
         /// Dictionary mapping runtime identifiers to their executable archive file paths
         /// </summary>
         public Dictionary<string, string> RuntimeArchivePaths { get; }
+
+        /// <summary>
+        /// When set to true, indicates this project should be excluded from archiving.
+        /// If null or false, the project will be archived.
+        /// </summary>
+        public bool? ExcludeFromArchiving { get; set; }
 
         /// <summary>
         /// Initializes inherited properties from global settings, solution configuration, and project configuration

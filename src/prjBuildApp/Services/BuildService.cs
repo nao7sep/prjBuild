@@ -298,6 +298,14 @@ namespace prjBuildApp.Services
         {
             var output = new List<string>();
 
+            // Check if the project is excluded from archiving
+            if (project.ExcludeFromArchiving == true)
+            {
+                _loggingService.Information("Project {ProjectName} is excluded from archiving, skipping", project.Name);
+                output.Add($"Project {project.Name} is excluded from archiving, skipping");
+                return output;
+            }
+
             // Validate the project before archiving
             // We'll check each runtime individually later, so we don't pass a specific runtime here
             var (canBuild, validationMessages) = ValidateProjectForBuild(project);
@@ -388,6 +396,15 @@ namespace prjBuildApp.Services
         {
             var output = new List<string>();
 
+            // Check if any projects in the solution need archiving (not excluded)
+            var projectsToArchive = solution.Projects.Where(p => p.ExcludeFromArchiving != true).ToList();
+            if (!projectsToArchive.Any())
+            {
+                _loggingService.Information("Solution {SolutionName} has all projects excluded from archiving, skipping", solution.Name);
+                output.Add($"Solution {solution.Name} has all projects excluded from archiving, skipping");
+                return output;
+            }
+
             // Validate that all projects in the solution have consistent versions
             if (!solution.ValidateVersions())
             {
@@ -397,7 +414,7 @@ namespace prjBuildApp.Services
             }
 
             // Check if any projects in the solution have no supported runtimes
-            var projectsWithNoRuntimes = solution.Projects.Where(p => p.SupportedRuntimes.Count == 0).ToList();
+            var projectsWithNoRuntimes = solution.Projects.Where(p => p.ExcludeFromArchiving != true && p.SupportedRuntimes.Count == 0).ToList();
             if (projectsWithNoRuntimes.Any())
             {
                 output.Add($"Solution {solution.Name} has {projectsWithNoRuntimes.Count} projects with no supported runtimes:");

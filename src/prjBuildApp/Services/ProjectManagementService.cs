@@ -86,9 +86,9 @@ namespace prjBuildApp.Services
                         }
 
                         // Check if all archives for this solution exist
-                        solution.IsArchived = _fileSystemService.AreAllArchivesExisting(solution);
+                        solution.AreAllArchivesExisting = _fileSystemService.AreAllArchivesExisting(solution);
 
-                        if (solution.IsArchived)
+                        if (solution.AreAllArchivesExisting)
                         {
                             _loggingService.Debug("Solution {SolutionName} is already archived", solution.Name);
                         }
@@ -147,6 +147,9 @@ namespace prjBuildApp.Services
                     _loggingService.Debug("Project runtime archive path for {Runtime}: {ArchivePath}",
                         runtime, archivePaths[runtime]);
                 }
+
+                // Initialize ExcludeFromArchiving property based on project configuration
+                project.ExcludeFromArchiving = projectConfig?.ExcludeFromArchiving; // Null by default (will be archived)
 
                 // Check if all versions within the project match
                 if (!project.ValidateVersions())
