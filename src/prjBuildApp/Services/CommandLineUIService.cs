@@ -51,6 +51,7 @@ namespace prjBuildApp.Services
                 DisplayProjectSelectionMenu();
 
                 // Get user choice
+                Console.WriteLine();
                 Console.Write("Enter your choice: ");
                 string? choice = Console.ReadLine();
 
@@ -75,7 +76,9 @@ namespace prjBuildApp.Services
                         }
                         else
                         {
-                            _loggingService.Information("No projects selected. Please select at least one project.");
+                            _loggingService.Warning("No projects selected. Please select at least one project.");
+                            Console.WriteLine("Press any key to continue...");
+                            Console.ReadKey();
                         }
                         break;
                     case "6":
@@ -98,8 +101,8 @@ namespace prjBuildApp.Services
 
         private void DisplayProjectSelectionMenu()
         {
-            Console.Clear();
-            Console.WriteLine("=== prjBuild Project Selection ===");
+            Console.WriteLine();
+            Console.WriteLine("=== Project Selection ===");
             Console.WriteLine();
 
             // Display all projects with selection status
@@ -144,12 +147,12 @@ namespace prjBuildApp.Services
                     List<string> problems = new List<string>();
                     if (!project.ValidateVersions())
                     {
-                        problems.Add("Version Mismatch");
+                        problems.Add("Version mismatch");
                     }
 
                     if (project.SupportedRuntimes.Count == 0)
                     {
-                        problems.Add("No Runtimes");
+                        problems.Add("No runtimes");
                     }
 
                     // Display problems if any exist
@@ -364,8 +367,8 @@ namespace prjBuildApp.Services
             bool back = false;
             while (!back)
             {
-                Console.Clear();
-                Console.WriteLine("=== prjBuild Operations ===");
+                Console.WriteLine();
+                Console.WriteLine("=== Operations ===");
                 Console.WriteLine();
 
                 Console.WriteLine($"Selected projects: {_selectedProjects.Count}");
@@ -381,6 +384,7 @@ namespace prjBuildApp.Services
                     ConsoleColor originalSolutionColor = Console.ForegroundColor;
 
                     // Write solution name
+                    Console.WriteLine();
                     Console.Write($"Solution: {solution.Name}");
 
                     // Add solution version problem if exists
@@ -388,7 +392,7 @@ namespace prjBuildApp.Services
                     {
                         Console.Write(" ");
                         Console.ForegroundColor = ConsoleColor.Red;
-                        Console.Write("(Solution version mismatch)");
+                        Console.Write("(Version mismatch)");
                         Console.ForegroundColor = originalSolutionColor;
                     }
 
@@ -410,12 +414,12 @@ namespace prjBuildApp.Services
                             List<string> problems = new List<string>();
                             if (!project.ValidateVersions())
                             {
-                                problems.Add("Version Mismatch");
+                                problems.Add("Version mismatch");
                             }
 
                             if (project.SupportedRuntimes.Count == 0)
                             {
-                                problems.Add("No Runtimes");
+                                problems.Add("No runtimes");
                             }
 
                             // Display problems if any exist
@@ -500,8 +504,6 @@ namespace prjBuildApp.Services
                             Console.WriteLine();
                         }
                     }
-
-                    Console.WriteLine();
                 }
 
                 Console.WriteLine();
@@ -511,6 +513,7 @@ namespace prjBuildApp.Services
                 Console.WriteLine("3. Rebuild and archive projects - Cleanup/rebuild projects and create archives");
                 Console.WriteLine("4. Return to selection");
 
+                Console.WriteLine();
                 Console.Write("Enter your choice: ");
                 string? choice = Console.ReadLine();
 
@@ -603,7 +606,7 @@ namespace prjBuildApp.Services
 
         private void UpdateNuGetPackages()
         {
-            Console.Clear();
+            Console.WriteLine();
             Console.WriteLine("=== Update NuGet packages ===");
             Console.WriteLine();
 
@@ -618,7 +621,7 @@ namespace prjBuildApp.Services
 
                 foreach (var line in output)
                 {
-                    _loggingService.Debug("Output: {Line}", line);
+                    _loggingService.Debug("NuGet package update output: {Line}", line);
                 }
             }
 
@@ -629,7 +632,7 @@ namespace prjBuildApp.Services
 
         private void BuildProjects()
         {
-            Console.Clear();
+            Console.WriteLine();
             Console.WriteLine("=== Build projects ===");
             Console.WriteLine();
 
@@ -644,7 +647,7 @@ namespace prjBuildApp.Services
 
                 foreach (var line in output)
                 {
-                    _loggingService.Debug("Output: {Line}", line);
+                    _loggingService.Debug("Build output: {Line}", line);
                 }
             }
 
@@ -655,7 +658,7 @@ namespace prjBuildApp.Services
 
         private void RebuildAndArchiveProjects()
         {
-            Console.Clear();
+            Console.WriteLine();
             Console.WriteLine("=== Rebuild and archive projects ===");
             Console.WriteLine("This will cleanup/rebuild projects and create archives");
             Console.WriteLine();
@@ -683,36 +686,31 @@ namespace prjBuildApp.Services
 
                 // First cleanup the project
                 _loggingService.Information("Cleaning up project {ProjectName}...", project.Name);
-                var cleanupOutput = _buildService.CleanupProject(project, true, true);
+                var cleanupOutput = _buildService.CleanupProject(project, deleteObjDirectory: true);
                 foreach (var line in cleanupOutput)
                 {
-                    _loggingService.Debug("Output: {Line}", line);
+                    _loggingService.Debug("Cleanup output: {Line}", line);
                 }
-
-                // Then publish the project
-                string publishDirectory = Path.Combine(rootDir, "publish", project.Name);
 
                 // Use the project's supported runtimes
                 var supportedRuntimes = project.SupportedRuntimes;
 
                 foreach (var runtime in supportedRuntimes)
                 {
-                    var publishOutput = _buildService.PublishProject(project, publishDirectory, runtime);
+                    var publishOutput = _buildService.PublishProject(project, runtime);
                     foreach (var line in publishOutput)
                     {
-                        _loggingService.Debug("Output: {Line}", line);
+                        _loggingService.Debug("Publish output: {Line}", line);
                     }
                 }
 
-                // Then archive the project
-                // Use the solution's archive directory path directly
-                string archiveDirectory = project.Solution.ArchiveDirectoryPath;
-                _loggingService.Information("Using archive directory: {ArchiveDirectory}", archiveDirectory);
-
-                var archiveOutput = _buildService.ArchiveProject(project, archiveDirectory, supportedRuntimes);
-                foreach (var line in archiveOutput)
+                foreach (var runtime in supportedRuntimes)
                 {
-                    _loggingService.Debug("Output: {Line}", line);
+                    var archiveOutput = _buildService.ArchiveProject(project, runtime);
+                    foreach (var line in archiveOutput)
+                    {
+                        _loggingService.Debug("Archive output: {Line}", line);
+                    }
                 }
 
                 // Log that archiving is complete

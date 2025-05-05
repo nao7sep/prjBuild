@@ -24,15 +24,19 @@ namespace prjBuildApp.Services
 
             try
             {
-                _loggingService.Information("Updating NuGet packages for project {ProjectName}", project.Name);
+                // First, restore the project to ensure dependencies are properly resolved
+                _loggingService.Information("Restoring project {ProjectName} before updating packages", project.Name);
+                var restoreArguments = new List<string> { "restore", $"\"{project.FilePath}\"" };
+                var restoreResult = RunDotNetCommand(restoreArguments, project.DirectoryPath);
+                output.AddRange(restoreResult);
 
-                // First, list outdated packages
-                var listArguments = new List<string> { "list", project.FilePath, "package", "--outdated" };
+                // Then, list outdated packages
+                var listArguments = new List<string> { "list", $"\"{project.FilePath}\"", "package", "--outdated" };
                 var listResult = RunDotNetCommand(listArguments, project.DirectoryPath);
                 output.AddRange(listResult);
 
                 // Extract package names from the output
-                var packageLines = listResult.Where(line => line.Contains(">")).ToList();
+                var packageLines = listResult.Where(line => line.Contains('>')).ToList();
                 if (packageLines.Count == 0)
                 {
                     _loggingService.Information("No outdated packages found for project {ProjectName}", project.Name);
@@ -46,7 +50,7 @@ namespace prjBuildApp.Services
                     if (parts.Length >= 2)
                     {
                         string packageName = parts[1];
-                        var updateArguments = new List<string> { "add", project.FilePath, "package", packageName };
+                        var updateArguments = new List<string> { "add", $"\"{project.FilePath}\"", "package", packageName };
                         var updateResult = RunDotNetCommand(updateArguments, project.DirectoryPath);
                         output.AddRange(updateResult);
 
@@ -57,36 +61,6 @@ namespace prjBuildApp.Services
             catch (Exception ex)
             {
                 _loggingService.Error(ex, "Error updating NuGet packages for project {ProjectName}", project.Name);
-                output.Add($"Error: {ex.Message}");
-            }
-
-            return output;
-        }
-
-        public List<string> RestoreProject(ProjectInfo project)
-        {
-            var output = new List<string>();
-
-            try
-            {
-                _loggingService.Information("Restoring dependencies for project {ProjectName}", project.Name);
-
-                var arguments = new List<string> { "restore", project.FilePath };
-                var result = RunDotNetCommand(arguments, project.DirectoryPath);
-                output.AddRange(result);
-
-                if (result.Any(line => line.Contains("Restore completed")))
-                {
-                    _loggingService.Information("Successfully restored dependencies for project {ProjectName}", project.Name);
-                }
-                else
-                {
-                    _loggingService.Warning("Restore may have failed for project {ProjectName}", project.Name);
-                }
-            }
-            catch (Exception ex)
-            {
-                _loggingService.Error(ex, "Error restoring dependencies for project {ProjectName}", project.Name);
                 output.Add($"Error: {ex.Message}");
             }
 
@@ -128,12 +102,12 @@ namespace prjBuildApp.Services
             return (canBuild, messages);
         }
 
-        public List<string> BuildProject(ProjectInfo project, string? runtime = null, bool noRestore = false)
+        public List<string> BuildProject(ProjectInfo project)
         {
             var output = new List<string>();
 
             // Validate the project before building
-            var (canBuild, validationMessages) = ValidateProjectForBuild(project, runtime);
+            var (canBuild, validationMessages) = ValidateProjectForBuild(project);
 
             // Add validation messages to output
             output.AddRange(validationMessages);
@@ -147,26 +121,12 @@ namespace prjBuildApp.Services
 
             try
             {
-                _loggingService.Information("Building project {ProjectName}", project.Name);
-
-                var arguments = new List<string> { "build", project.FilePath, "--configuration", "Release" };
-
-                if (!string.IsNullOrEmpty(runtime))
-                {
-                    arguments.Add("--runtime");
-                    arguments.Add(runtime);
-                    arguments.Add("--self-contained");
-                }
-
-                if (noRestore)
-                {
-                    arguments.Add("--no-restore");
-                }
+                var arguments = new List<string> { "build", $"\"{project.FilePath}\"", "--configuration", "Release" };
 
                 var result = RunDotNetCommand(arguments, project.DirectoryPath);
                 output.AddRange(result);
 
-                if (result.Any(line => line.Contains("Build succeeded")))
+                if (result.Any(line => line.Contains("Build succeeded") || line.Contains("ビルドに成功しました")))
                 {
                     _loggingService.Information("Successfully built project {ProjectName}", project.Name);
                 }
@@ -184,7 +144,41 @@ namespace prjBuildApp.Services
             return output;
         }
 
-        public List<string> PublishProject(ProjectInfo project, string outputDirectory, string? runtime = null)
+        public List<string> CleanupProject(ProjectInfo project, bool deleteObjDirectory = true)
+        {
+            var output = new List<string>();
+
+            try
+            {
+                _loggingService.Information("Cleaning up project {ProjectName}", project.Name);
+
+                // Clean the project using dotnet clean
+                var cleanArguments = new List<string> { "clean", $"\"{project.FilePath}\"", "--configuration", "Release" };
+                var cleanResult = RunDotNetCommand(cleanArguments, project.DirectoryPath);
+                output.AddRange(cleanResult);
+
+                // Delete obj directory if specified
+                if (deleteObjDirectory)
+                {
+                    string objDir = Path.Combine(project.DirectoryPath, "obj");
+                    if (Directory.Exists(objDir))
+                    {
+                        Directory.Delete(objDir, true);
+                        output.Add($"Deleted directory: {objDir}");
+                        _loggingService.Information("Deleted obj directory for project {ProjectName}", project.Name);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.Error(ex, "Error cleaning up project {ProjectName}", project.Name);
+                output.Add($"Error: {ex.Message}");
+            }
+
+            return output;
+        }
+
+        public List<string> PublishProject(ProjectInfo project, string runtime)
         {
             var output = new List<string>();
 
@@ -205,26 +199,27 @@ namespace prjBuildApp.Services
             {
                 _loggingService.Information("Publishing project {ProjectName}", project.Name);
 
-                // Create output directory if it doesn't exist
-                if (!Directory.Exists(outputDirectory))
+                // Construct output directory: project root + bin + Publish + runtime
+                string outputDirectory = Path.Combine(project.DirectoryPath, "bin", "Publish", runtime);
+
+                // Delete the output directory if it already exists
+                if (Directory.Exists(outputDirectory))
                 {
-                    Directory.CreateDirectory(outputDirectory);
-                    output.Add($"Created directory: {outputDirectory}");
+                    Directory.Delete(outputDirectory, true);
+                    output.Add($"Deleted existing directory: {outputDirectory}");
                 }
+
+                // Create output directory
+                Directory.CreateDirectory(outputDirectory);
+                output.Add($"Created directory: {outputDirectory}");
 
                 var arguments = new List<string> {
                     "publish",
-                    project.FilePath,
+                    $"\"{project.FilePath}\"",
                     "--configuration", "Release",
-                    "--output", outputDirectory
+                    "--output", $"\"{outputDirectory}\"",
+                    "--runtime", runtime
                 };
-
-                if (!string.IsNullOrEmpty(runtime))
-                {
-                    arguments.Add("--runtime");
-                    arguments.Add(runtime);
-                    arguments.Add("--self-contained");
-                }
 
                 var result = RunDotNetCommand(arguments, project.DirectoryPath);
                 output.AddRange(result);
@@ -248,67 +243,12 @@ namespace prjBuildApp.Services
             return output;
         }
 
-        public List<string> CleanupProject(ProjectInfo project, bool deleteBinDirectory = false, bool deleteObjDirectory = true)
+        public List<string> ArchiveProject(ProjectInfo project, string runtime)
         {
             var output = new List<string>();
-
-            try
-            {
-                _loggingService.Information("Cleaning up project {ProjectName}", project.Name);
-
-                // Clean the project using dotnet clean
-                var cleanArguments = new List<string> { "clean", project.FilePath };
-                var cleanResult = RunDotNetCommand(cleanArguments, project.DirectoryPath);
-                output.AddRange(cleanResult);
-
-                // Delete bin directory if specified
-                if (deleteBinDirectory)
-                {
-                    string binDir = Path.Combine(project.DirectoryPath, "bin");
-                    if (Directory.Exists(binDir))
-                    {
-                        Directory.Delete(binDir, true);
-                        output.Add($"Deleted directory: {binDir}");
-                        _loggingService.Information("Deleted bin directory for project {ProjectName}", project.Name);
-                    }
-                }
-
-                // Delete obj directory if specified
-                if (deleteObjDirectory)
-                {
-                    string objDir = Path.Combine(project.DirectoryPath, "obj");
-                    if (Directory.Exists(objDir))
-                    {
-                        Directory.Delete(objDir, true);
-                        output.Add($"Deleted directory: {objDir}");
-                        _loggingService.Information("Deleted obj directory for project {ProjectName}", project.Name);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _loggingService.Error(ex, "Error cleaning up project {ProjectName}", project.Name);
-                output.Add($"Error: {ex.Message}");
-            }
-
-            return output;
-        }
-
-        public List<string> ArchiveProject(ProjectInfo project, string archiveDirectory, List<string> supportedRuntimes)
-        {
-            var output = new List<string>();
-
-            // Check if the project is excluded from archiving
-            if (project.ExcludeFromArchiving == true)
-            {
-                _loggingService.Information("Project {ProjectName} is excluded from archiving, skipping", project.Name);
-                output.Add($"Project {project.Name} is excluded from archiving, skipping");
-                return output;
-            }
 
             // Validate the project before archiving
-            // We'll check each runtime individually later, so we don't pass a specific runtime here
-            var (canBuild, validationMessages) = ValidateProjectForBuild(project);
+            var (canBuild, validationMessages) = ValidateProjectForBuild(project, runtime);
 
             // Add validation messages to output
             output.AddRange(validationMessages);
@@ -322,141 +262,83 @@ namespace prjBuildApp.Services
 
             try
             {
-                _loggingService.Information("Archiving project {ProjectName}", project.Name);
+                _loggingService.Information("Archiving project {ProjectName} for runtime {Runtime}", project.Name, runtime);
 
-                // Create archive directory if it doesn't exist
-                if (!Directory.Exists(archiveDirectory))
+                // Create binary archive - assuming the project has already been published
+                string binDir = Path.Combine(project.DirectoryPath, "bin", "Publish", runtime);
+                if (Directory.Exists(binDir))
                 {
-                    Directory.CreateDirectory(archiveDirectory);
-                }
+                    // Get the archive path for this runtime
+                    var archivePaths = _fileSystemService.GetProjectRuntimeArchivePaths(project);
 
-                // Archive binaries for each supported runtime
-                foreach (var runtime in supportedRuntimes)
-                {
-                    // Validate this specific runtime
-                    var (canBuildRuntime, runtimeValidationMessages) = ValidateProjectForBuild(project, runtime);
-
-                    if (!canBuildRuntime)
+                    if (!archivePaths.ContainsKey(runtime))
                     {
-                        output.AddRange(runtimeValidationMessages);
-                        _loggingService.Warning("Skipping runtime {Runtime} for project {ProjectName} due to validation failures",
+                        output.Add($"No archive path defined for runtime {runtime}");
+                        _loggingService.Warning("No archive path defined for runtime {Runtime} in project {ProjectName}",
                             runtime, project.Name);
-                        continue;
+                        return output;
                     }
 
-                    // Build the project for this runtime with noRestore=true for efficiency
-                    var buildOutput = BuildProject(project, runtime, true);
-                    output.AddRange(buildOutput);
+                    string archiveFilePath = archivePaths[runtime];
+                    string? archiveDirectory = Path.GetDirectoryName(archiveFilePath);
 
-                    // Create binary archive
-                    string binDir = Path.Combine(project.DirectoryPath, "bin", "Release", "net9.0", runtime);
-                    if (Directory.Exists(binDir))
+                    // Create archive directory if it doesn't exist
+                    if (!string.IsNullOrEmpty(archiveDirectory) && !Directory.Exists(archiveDirectory))
                     {
-                        // Get all runtime archive paths
-                        var archivePaths = _fileSystemService.GetProjectRuntimeArchivePaths(project);
-                        string archiveFilePath = archivePaths[runtime];
-                        string archiveFileName = Path.GetFileName(archiveFilePath);
-
-                        if (_fileSystemService.CreateZipArchive(binDir, archiveFilePath))
-                        {
-                            output.Add($"Created binary archive: {archiveFilePath}");
-                            _loggingService.Information("Created binary archive for project {ProjectName} and runtime {Runtime}: {ArchiveFileName}",
-                                project.Name, runtime, archiveFileName);
-                        }
+                        Directory.CreateDirectory(archiveDirectory);
                     }
+
+                    string archiveFileName = Path.GetFileName(archiveFilePath);
+
+                    if (_fileSystemService.CreateZipArchive(binDir, archiveFilePath, project.IgnoredObjectNames, project.IgnoredObjectRelativePaths))
+                    {
+                        output.Add($"Created binary archive: {archiveFilePath}");
+                        _loggingService.Information("Created binary archive for project {ProjectName} and runtime {Runtime}: {ArchiveFileName}",
+                            project.Name, runtime, archiveFileName);
+                    }
+                    else
+                    {
+                        output.Add($"Failed to create binary archive: {archiveFilePath}");
+                        _loggingService.Warning("Failed to create binary archive for project {ProjectName} and runtime {Runtime}",
+                            project.Name, runtime);
+                    }
+                }
+                else
+                {
+                    output.Add($"Binary directory not found: {binDir}");
+                    _loggingService.Warning("Binary directory not found for project {ProjectName} and runtime {Runtime}: {BinDir}",
+                        project.Name, runtime, binDir);
                 }
 
                 // Archive source code (at solution level)
                 var solution = project.Solution;
                 string sourceArchiveFilePath = _fileSystemService.GetSolutionSourceArchivePath(solution);
+                string? sourceArchiveDirectory = Path.GetDirectoryName(sourceArchiveFilePath);
+
+                // Create source archive directory if it doesn't exist
+                if (!string.IsNullOrEmpty(sourceArchiveDirectory) && !Directory.Exists(sourceArchiveDirectory))
+                {
+                    Directory.CreateDirectory(sourceArchiveDirectory);
+                }
+
                 string sourceArchiveFileName = Path.GetFileName(sourceArchiveFilePath);
 
-                if (_fileSystemService.CreateZipArchive(solution.DirectoryPath, sourceArchiveFilePath))
+                if (_fileSystemService.CreateZipArchive(solution.DirectoryPath, sourceArchiveFilePath, solution.IgnoredObjectNames, solution.IgnoredObjectRelativePaths))
                 {
                     output.Add($"Created source archive for solution: {sourceArchiveFilePath}");
                     _loggingService.Information("Created source archive for solution {SolutionName}: {ArchiveFileName}",
                         solution.Name, sourceArchiveFileName);
                 }
+                else
+                {
+                    output.Add($"Failed to create source archive for solution: {sourceArchiveFilePath}");
+                    _loggingService.Warning("Failed to create source archive for solution {SolutionName}",
+                        solution.Name);
+                }
             }
             catch (Exception ex)
             {
                 _loggingService.Error(ex, "Error archiving project {ProjectName}", project.Name);
-                output.Add($"Error: {ex.Message}");
-            }
-
-            return output;
-        }
-
-        /// <summary>
-        /// Archives a solution by creating a zip file of its source code
-        /// </summary>
-        /// <param name="solution">The solution to archive</param>
-        /// <returns>A list of output messages from the archiving process</returns>
-        public List<string> ArchiveSolution(SolutionInfo solution)
-        {
-            var output = new List<string>();
-
-            // Check if any projects in the solution need archiving (not excluded)
-            var projectsToArchive = solution.Projects.Where(p => p.ExcludeFromArchiving != true).ToList();
-            if (!projectsToArchive.Any())
-            {
-                _loggingService.Information("Solution {SolutionName} has all projects excluded from archiving, skipping", solution.Name);
-                output.Add($"Solution {solution.Name} has all projects excluded from archiving, skipping");
-                return output;
-            }
-
-            // Validate that all projects in the solution have consistent versions
-            if (!solution.ValidateVersions())
-            {
-                output.Add($"Solution {solution.Name} has projects with mismatched versions");
-                _loggingService.Warning("Cannot archive solution {SolutionName} due to version mismatches between projects", solution.Name);
-                return output;
-            }
-
-            // Check if any projects in the solution have no supported runtimes
-            var projectsWithNoRuntimes = solution.Projects.Where(p => p.ExcludeFromArchiving != true && p.SupportedRuntimes.Count == 0).ToList();
-            if (projectsWithNoRuntimes.Any())
-            {
-                output.Add($"Solution {solution.Name} has {projectsWithNoRuntimes.Count} projects with no supported runtimes:");
-                foreach (var project in projectsWithNoRuntimes)
-                {
-                    output.Add($"- {project.Name}");
-                }
-                _loggingService.Warning("Cannot archive solution {SolutionName} due to projects with no supported runtimes", solution.Name);
-                return output;
-            }
-
-            try
-            {
-                _loggingService.Information("Archiving solution {SolutionName}", solution.Name);
-
-                // Get the archive file path for the solution
-                string archiveFilePath = _fileSystemService.GetSolutionSourceArchivePath(solution);
-
-                // Create the archive directory if it doesn't exist
-                string? archiveDirectory = Path.GetDirectoryName(archiveFilePath);
-                if (!string.IsNullOrEmpty(archiveDirectory) && !Directory.Exists(archiveDirectory))
-                {
-                    Directory.CreateDirectory(archiveDirectory);
-                }
-
-                // Archive the solution source code
-                if (_fileSystemService.CreateZipArchive(solution.DirectoryPath, archiveFilePath))
-                {
-                    output.Add($"Created solution archive: {archiveFilePath}");
-                    string fileName = Path.GetFileName(archiveFilePath);
-                    _loggingService.Information("Created archive for solution {SolutionName}: {ArchiveFileName}",
-                        solution.Name, fileName);
-                }
-                else
-                {
-                    output.Add($"Failed to create solution archive: {archiveFilePath}");
-                    _loggingService.Warning("Failed to create archive for solution {SolutionName}", solution.Name);
-                }
-            }
-            catch (Exception ex)
-            {
-                _loggingService.Error(ex, "Error archiving solution {SolutionName}", solution.Name);
                 output.Add($"Error: {ex.Message}");
             }
 
@@ -477,8 +359,14 @@ namespace prjBuildApp.Services
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     UseShellExecute = false,
-                    CreateNoWindow = true
+                    CreateNoWindow = true,
+                    StandardOutputEncoding = System.Text.Encoding.UTF8,
+                    StandardErrorEncoding = System.Text.Encoding.UTF8
                 };
+
+                // Log the command we're about to run
+                _loggingService.Information("Running dotnet command: {Command} in {Directory}",
+                    string.Join(" ", arguments), workingDirectory);
 
                 using var process = new Process { StartInfo = startInfo };
                 process.Start();
@@ -489,7 +377,11 @@ namespace prjBuildApp.Services
                     var line = process.StandardOutput.ReadLine();
                     if (!string.IsNullOrEmpty(line))
                     {
-                        output.Add(line);
+                        string prefixedLine = $"[OUT] {line}";
+                        output.Add(line);  // Store original line without prefix in output
+
+                        // Log to both console and log file
+                        _loggingService.Information(prefixedLine);
                     }
                 }
 
@@ -499,11 +391,18 @@ namespace prjBuildApp.Services
                     var line = process.StandardError.ReadLine();
                     if (!string.IsNullOrEmpty(line))
                     {
-                        output.Add($"Error: {line}");
+                        string prefixedLine = $"[ERR] {line}";
+                        output.Add($"Error: {line}");  // Store error line in output
+
+                        // Log to both console and log file
+                        _loggingService.Warning(prefixedLine);
                     }
                 }
 
                 process.WaitForExit();
+
+                // Log the exit code
+                _loggingService.Information("Process exited with code: {ExitCode}", process.ExitCode);
             }
             catch (Exception ex)
             {
