@@ -125,15 +125,6 @@ namespace prjBuildApp.Services
 
                 var result = RunDotNetCommand(arguments, project.DirectoryPath);
                 output.AddRange(result);
-
-                if (result.Any(line => line.Contains("Build succeeded") || line.Contains("ビルドに成功しました")))
-                {
-                    _loggingService.Information("Successfully built project {ProjectName}", project.Name);
-                }
-                else
-                {
-                    _loggingService.Warning("Build may have failed for project {ProjectName}", project.Name);
-                }
             }
             catch (Exception ex)
             {
@@ -223,16 +214,6 @@ namespace prjBuildApp.Services
 
                 var result = RunDotNetCommand(arguments, project.DirectoryPath);
                 output.AddRange(result);
-
-                if (result.Any(line => line.Contains("Published")))
-                {
-                    _loggingService.Information("Successfully published project {ProjectName} to {OutputDirectory}",
-                        project.Name, outputDirectory);
-                }
-                else
-                {
-                    _loggingService.Warning("Publish may have failed for project {ProjectName}", project.Name);
-                }
             }
             catch (Exception ex)
             {

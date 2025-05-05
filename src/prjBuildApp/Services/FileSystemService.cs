@@ -95,57 +95,83 @@ namespace prjBuildApp.Services
                     Directory.CreateDirectory(destinationDirectory);
                 }
 
+                // Delete the destination file if it already exists to ensure silent overwrite
+                if (File.Exists(destinationArchiveFile))
+                {
+                    File.Delete(destinationArchiveFile);
+                }
+
                 // Create the archive with relative paths
                 using (var archive = ZipFile.Open(destinationArchiveFile, ZipArchiveMode.Create))
                 {
-                    // Get all files in the source directory (recursively)
-                    var allFiles = Directory.GetFiles(sourceDirectory, "*", SearchOption.AllDirectories);
                     var filesToArchive = new List<string>();
 
-                    // Filter out ignored files
-                    foreach (var file in allFiles)
+                    // Local function to check if an object should be ignored
+                    bool ShouldIgnore(string path, string relativePath)
                     {
-                        string fileName = Path.GetFileName(file);
-                        string relativePath = Path.GetRelativePath(sourceDirectory, file);
+                        string name = Path.GetFileName(path);
 
-                        bool shouldIgnore = false;
-
-                        // Check if file name is in the ignored names list
-                        if (ignoredObjectNames != null && ignoredObjectNames.Contains(fileName, StringComparer.OrdinalIgnoreCase))
+                        // Check if name is in the ignored names list
+                        if (ignoredObjectNames != null && ignoredObjectNames.Contains(name, StringComparer.OrdinalIgnoreCase))
                         {
-                            _loggingService.Debug("Ignoring {Path} because its name is in the ignore list", file);
-                            shouldIgnore = true;
+                            _loggingService.Debug("Ignoring {Path} because its name is in the ignore list", path);
+                            return true;
                         }
 
                         // Check if relative path contains any ignored path patterns
-                        if (!shouldIgnore && ignoredObjectRelativePaths != null)
+                        if (ignoredObjectRelativePaths != null)
                         {
                             foreach (var ignoredPath in ignoredObjectRelativePaths)
                             {
                                 if (relativePath.Contains(ignoredPath, StringComparison.OrdinalIgnoreCase))
                                 {
-                                    _loggingService.Debug("Ignoring {Path} because its relative path contains a pattern in the ignore list", file);
-                                    shouldIgnore = true;
-                                    break;
+                                    _loggingService.Debug("Ignoring {Path} because its relative path contains a pattern in the ignore list", path);
+                                    return true;
                                 }
                             }
                         }
 
-                        if (!shouldIgnore)
+                        return false;
+                    }
+
+                    // Local recursive function to scan directories
+                    void ScanDirectory(string directory)
+                    {
+                        string relativeDirPath = Path.GetRelativePath(sourceDirectory, directory);
+                        bool isRootDir = directory.Equals(sourceDirectory, StringComparison.OrdinalIgnoreCase);
+
+                        // Skip checking the root directory against ignore patterns
+                        if (!isRootDir && ShouldIgnore(directory, relativeDirPath))
                         {
-                            filesToArchive.Add(file);
+                            return; // Skip this directory and all its contents
+                        }
+
+                        // Process all subdirectories first (recursive)
+                        foreach (var subDir in Directory.GetDirectories(directory))
+                        {
+                            ScanDirectory(subDir);
+                        }
+
+                        // Then process all files in this directory (non-recursive)
+                        foreach (var file in Directory.GetFiles(directory))
+                        {
+                            string relativeFilePath = Path.GetRelativePath(sourceDirectory, file);
+
+                            if (!ShouldIgnore(file, relativeFilePath))
+                            {
+                                filesToArchive.Add(file);
+                            }
                         }
                     }
 
+                    // Start the recursive scan from the source directory
+                    ScanDirectory(sourceDirectory);
+
+                    // Add files to the archive
                     foreach (var file in filesToArchive)
                     {
-                        // Use the relative path without the base directory
                         string entryName = Path.GetRelativePath(sourceDirectory, file);
-
-                        // Replace Windows backslashes with forward slashes for zip entries
-                        entryName = entryName.Replace('\\', '/');
-
-                        // Create the entry and copy the file content
+                        entryName = entryName.Replace('\\', '/'); // Use forward slashes for zip entries
                         archive.CreateEntryFromFile(file, entryName, CompressionLevel.Optimal);
                     }
                 }

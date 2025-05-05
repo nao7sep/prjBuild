@@ -137,6 +137,7 @@ namespace prjBuildApp.Models.Project
         /// 1. Always displays Major and Minor (first 2 fields)
         /// 2. If Build (3rd field) is not 0, it is displayed
         /// 3. If Revision (4th field) is not 0, both Build and Revision are displayed regardless of Build's value
+        /// Note: If Minor or Revision is -1, they will be treated as not specified in the output format
         /// </summary>
         /// <param name="version">The Version object to convert</param>
         /// <returns>A string representation of the version in the format "v{major}.{minor}[.{build}[.{revision}]]"</returns>
@@ -152,12 +153,12 @@ namespace prjBuildApp.Models.Project
             string formattedVersion = $"v{version.Major}.{version.Minor}";
 
             // If Revision (4th field) is not 0, display both Build and Revision
-            if (version.Revision != 0)
+            if (version.Revision > 0)
             {
                 formattedVersion = $"{formattedVersion}.{version.Build}.{version.Revision}";
             }
             // If only Build (3rd field) is not 0, display just the Build
-            else if (version.Build != 0)
+            else if (version.Build > 0)
             {
                 formattedVersion = $"{formattedVersion}.{version.Build}";
             }
