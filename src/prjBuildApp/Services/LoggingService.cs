@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Serilog;
 using Serilog.Events;
+using Serilog.Core;
 using System;
 using System.IO;
 
@@ -18,18 +19,20 @@ namespace prjBuildApp.Services
                 string logsDirectory = Path.Combine(AppContext.BaseDirectory, "logs");
                 Directory.CreateDirectory(logsDirectory);
 
-                // Configure Serilog directly in code instead of reading from appsettings.json
+                // Set global minimum level to Verbose to capture everything
                 var loggerConfig = new LoggerConfiguration()
-                    .MinimumLevel.Information()
+                    .MinimumLevel.Verbose()
                     .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
                     .MinimumLevel.Override("System", LogEventLevel.Warning)
-                    // Add WriteTo configurations directly in code
+                    // Configure console with restricted level (Information and above)
                     .WriteTo.Console(
+                        restrictedToMinimumLevel: LogEventLevel.Information,
                         outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
+                    // Configure file with all levels (Verbose and above)
                     .WriteTo.File(
                         path: Path.Combine(logsDirectory, $"prjBuild-{DateTime.Now:yyyyMMdd-HHmmss}.log"),
-                        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
-                    // Add Enrich configurations directly in code
+                        restrictedToMinimumLevel: LogEventLevel.Verbose,
+                        outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {Message:lj}{NewLine}{Exception}")
                     .Enrich.FromLogContext();
 
                 _logger = loggerConfig.CreateLogger();
@@ -45,14 +48,17 @@ namespace prjBuildApp.Services
                 string logsDirectory = Path.Combine(AppContext.BaseDirectory, "logs");
                 Directory.CreateDirectory(logsDirectory);
 
-                // Fallback logger that matches configuration structure but with Debug level
+                // Fallback logger that captures everything to file but restricts console
                 _logger = new LoggerConfiguration()
-                    .MinimumLevel.Debug()
+                    .MinimumLevel.Verbose()
                     .Enrich.FromLogContext()
-                    .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
+                    .WriteTo.Console(
+                        restrictedToMinimumLevel: LogEventLevel.Information,
+                        outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
                     .WriteTo.File(
                         Path.Combine(logsDirectory, $"prjBuild-{DateTime.Now:yyyyMMdd-HHmmss}.log"),
-                        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
+                        restrictedToMinimumLevel: LogEventLevel.Verbose,
+                        outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {Message:lj}{NewLine}{Exception}")
                     .CreateLogger();
 
                 // Set as static logger for global usage

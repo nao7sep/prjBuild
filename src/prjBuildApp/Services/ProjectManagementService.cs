@@ -202,17 +202,18 @@ namespace prjBuildApp.Services
                     string[] lines = File.ReadAllLines(assemblyInfoPath);
                     foreach (var line in lines)
                     {
-                        if (line.Contains("AssemblyVersion") && line.Contains("\""))
+                        if (line.Contains("AssemblyVersion") && line.Contains('\"'))
                         {
-                            int startIndex = line.IndexOf("\"") + 1;
-                            int endIndex = line.LastIndexOf("\"");
+                            int startIndex = line.IndexOf('\"') + 1;
+                            int endIndex = line.LastIndexOf('\"');
                             if (startIndex > 0 && endIndex > startIndex)
                             {
                                 string versionString = line.Substring(startIndex, endIndex - startIndex);
                                 var versionSource = new VersionSource(VersionSourceType.AssemblyInfo, assemblyInfoPath, versionString);
                                 project.VersionManager.VersionSources.Add(versionSource);
 
-                                _loggingService.Debug("Extracted version {Version} from AssemblyInfo.cs", versionString);
+                                _loggingService.Debug("Extracted version {Version} from assembly info file {AssemblyInfoFile}",
+                                    versionString, assemblyInfoPath);
                             }
                         }
                     }
@@ -244,7 +245,8 @@ namespace prjBuildApp.Services
                                 var versionSource = new VersionSource(VersionSourceType.Manifest, manifestPath, versionString);
                                 project.VersionManager.VersionSources.Add(versionSource);
 
-                                _loggingService.Debug("Extracted version {Version} from app.manifest", versionString);
+                                _loggingService.Debug("Extracted version {Version} from manifest file {ManifestFile}",
+                                    versionString, manifestPath);
                             }
                         }
                     }

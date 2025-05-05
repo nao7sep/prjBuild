@@ -3,6 +3,35 @@ using System.Collections.Generic;
 
 namespace prjBuildApp.Models.Project
 {
+    /// <summary>
+    /// Extension methods for the Version class
+    /// </summary>
+    public static class VersionExtensions
+    {
+        /// <summary>
+        /// Compares two Version objects field-by-field
+        /// </summary>
+        /// <param name="version1">The first version to compare</param>
+        /// <param name="version2">The second version to compare</param>
+        /// <returns>True if the versions are equal, false otherwise</returns>
+        public static bool AreVersionsEqual(this Version? version1, Version? version2)
+        {
+            // If both are null, they're equal
+            if (version1 == null && version2 == null)
+                return true;
+
+            // If only one is null, they're not equal
+            if (version1 == null || version2 == null)
+                return false;
+
+            // Compare all fields
+            return version1.Major == version2.Major &&
+                   version1.Minor == version2.Minor &&
+                   version1.Build == version2.Build &&
+                   version1.Revision == version2.Revision;
+        }
+    }
+
     public enum VersionSourceType
     {
         /// <summary>
@@ -79,7 +108,7 @@ namespace prjBuildApp.Models.Project
 
             foreach (var source in VersionSources)
             {
-                if (source.ParsedVersion == null || source.ParsedVersion != primaryVersion)
+                if (source.ParsedVersion == null || !source.ParsedVersion.AreVersionsEqual(primaryVersion))
                     return false;
             }
 
@@ -108,7 +137,7 @@ namespace prjBuildApp.Models.Project
             {
                 var projectPrimaryVersion = project.VersionManager.GetPrimaryVersionSource()?.ParsedVersion;
 
-                if (projectPrimaryVersion == null || projectPrimaryVersion != primaryVersion)
+                if (projectPrimaryVersion == null || !projectPrimaryVersion.AreVersionsEqual(primaryVersion))
                     return false;
             }
 

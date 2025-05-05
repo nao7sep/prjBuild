@@ -55,7 +55,7 @@ namespace prjBuildApp
                 // Log the error to a file with format matching Serilog's file output format exactly
                 string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
                 string timeZone = DateTime.Now.ToString("zzz");
-                string logContent = $"{timestamp} {timeZone} [FTL] {ex.Message}{Environment.NewLine}";
+                string logContent = $"[{timestamp} {timeZone} FTL] {ex.Message}{Environment.NewLine}";
 
                 // Only add stack trace if available (avoid redundant newline)
                 if (!string.IsNullOrEmpty(ex.StackTrace))
