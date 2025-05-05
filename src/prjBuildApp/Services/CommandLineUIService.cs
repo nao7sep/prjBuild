@@ -43,6 +43,9 @@ namespace prjBuildApp.Services
                 return;
             }
 
+            // Auto-select projects that need archiving on first run
+            AutoSelectProjectsNeedingArchives();
+
             // Main application loop
             bool exit = false;
             while (!exit)
@@ -685,7 +688,6 @@ namespace prjBuildApp.Services
                 }
 
                 // First cleanup the project
-                _loggingService.Information("Cleaning up project {ProjectName}...", project.Name);
                 var cleanupOutput = _buildService.CleanupProject(project, deleteObjDirectory: true);
                 foreach (var line in cleanupOutput)
                 {
@@ -718,6 +720,38 @@ namespace prjBuildApp.Services
             }
 
             _loggingService.Information("Rebuild and archive completed");
+            Console.WriteLine("Press any key to continue...");
+            Console.ReadKey();
+        }
+
+        private void AutoSelectProjectsNeedingArchives()
+        {
+            _selectedProjects.Clear();
+
+            foreach (var solution in _projectManagementService.Solutions)
+            {
+                // Only consider projects from solutions that don't have all archives existing
+                if (!solution.AreAllArchivesExisting)
+                {
+                    foreach (var project in solution.Projects.Where(p =>
+                        // Don't select projects excluded from archiving
+                        p.ExcludeFromArchiving != true &&
+                        // Only select projects that have valid versions
+                        p.ValidateVersions() &&
+                        // Only select projects that have at least one supported runtime
+                        p.SupportedRuntimes.Count > 0))
+                    {
+                        _selectedProjects.Add(project);
+                        _loggingService.Debug("Auto-selected project for archiving: {SolutionName} / {ProjectName}",
+                            project.Solution.Name, project.Name);
+                    }
+                }
+            }
+
+            if (_selectedProjects.Count > 0)
+            {
+                _loggingService.Information("Auto-selected {Count} projects needing archives", _selectedProjects.Count);
+            }
         }
     }
 }

@@ -16,19 +16,27 @@ namespace prjBuildApp.Models.Project
         /// <returns>True if the versions are equal, false otherwise</returns>
         public static bool AreVersionsEqual(this Version? version1, Version? version2)
         {
-            // If both are null, they're equal
+            // If both are null, they're considered undefined, return false
             if (version1 == null && version2 == null)
-                return true;
+                return false;
 
             // If only one is null, they're not equal
             if (version1 == null || version2 == null)
                 return false;
 
-            // Compare all fields
+            // Get normalized build values (treat -1 or lower as 0)
+            int build1 = version1.Build <= 0 ? 0 : version1.Build;
+            int build2 = version2.Build <= 0 ? 0 : version2.Build;
+
+            // Get normalized revision values (treat -1 or lower as 0)
+            int revision1 = version1.Revision <= 0 ? 0 : version1.Revision;
+            int revision2 = version2.Revision <= 0 ? 0 : version2.Revision;
+
+            // Compare all fields with normalized values for Build and Revision
             return version1.Major == version2.Major &&
                    version1.Minor == version2.Minor &&
-                   version1.Build == version2.Build &&
-                   version1.Revision == version2.Revision;
+                   build1 == build2 &&
+                   revision1 == revision2;
         }
     }
 
