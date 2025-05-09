@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Serilog;
 using Serilog.Events;
 using Serilog.Core;
+using Serilog.Sinks.SystemConsole.Themes;
 using System;
 using System.IO;
 
@@ -11,7 +12,7 @@ namespace prjBuildApp.Services
     {
         private readonly ILogger _logger;
 
-        public LoggingService(IConfiguration configuration)
+        public LoggingService(IConfiguration configuration, ConsoleThemeService consoleThemeService)
         {
             try
             {
@@ -26,6 +27,7 @@ namespace prjBuildApp.Services
                     .MinimumLevel.Override("System", LogEventLevel.Warning)
                     // Configure console with restricted level (Information and above)
                     .WriteTo.Console(
+                        theme: consoleThemeService.GetSerilogTheme(),
                         restrictedToMinimumLevel: LogEventLevel.Information,
                         outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
                     // Configure file with all levels (Verbose and above)
@@ -40,31 +42,23 @@ namespace prjBuildApp.Services
                 // Set as static logger for global usage
                 Log.Logger = _logger;
 
-                _logger.Information("Logging initialized");
+                Information("Logging initialized with {Theme} theme",
+                    consoleThemeService.CurrentTheme);
+                Information("Detected terminal environment: {Environment}",
+                    consoleThemeService.DetectedEnvironment);
             }
             catch (Exception ex)
             {
-                // Create logs directory for fallback logger if it doesn't exist
-                string logsDirectory = Path.Combine(AppContext.BaseDirectory, "logs");
-                Directory.CreateDirectory(logsDirectory);
+                // Create a simple console logger for the error
+                Console.WriteLine($"Error initializing logger: {ex.Message}");
 
-                // Fallback logger that captures everything to file but restricts console
+                // Create a minimal logger
                 _logger = new LoggerConfiguration()
-                    .MinimumLevel.Verbose()
-                    .Enrich.FromLogContext()
-                    .WriteTo.Console(
-                        restrictedToMinimumLevel: LogEventLevel.Information,
-                        outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
-                    .WriteTo.File(
-                        Path.Combine(logsDirectory, $"prjBuild-{DateTime.Now:yyyyMMdd-HHmmss}.log"),
-                        restrictedToMinimumLevel: LogEventLevel.Verbose,
-                        outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {Message:lj}{NewLine}{Exception}")
+                    .WriteTo.Console()
                     .CreateLogger();
 
                 // Set as static logger for global usage
                 Log.Logger = _logger;
-
-                _logger.Error(ex, "Failed to initialize logging from configuration");
             }
         }
 

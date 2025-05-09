@@ -3,6 +3,7 @@ using prjBuildApp.Services;
 using Serilog;
 using System;
 using System.IO;
+using System.Linq;
 
 namespace prjBuildApp
 {
@@ -10,13 +11,19 @@ namespace prjBuildApp
     {
         static void Main(string[] args)
         {
+            // Check for light theme parameter
+            bool useLightTheme = args.Contains("--light", StringComparer.OrdinalIgnoreCase);
+
             try
             {
+                // Create console theme service first (before logging)
+                var consoleThemeService = new ConsoleThemeService(useLightTheme);
+
                 // Create configuration service
                 var configService = new ConfigurationService();
 
-                // Create logging service
-                var loggingService = new LoggingService(configService.Configuration);
+                // Create logging service with the console theme
+                var loggingService = new LoggingService(configService.Configuration, consoleThemeService);
 
                 // Log application start
                 loggingService.Information("prjBuild application starting");
