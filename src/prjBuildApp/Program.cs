@@ -11,19 +11,13 @@ namespace prjBuildApp
     {
         static void Main(string[] args)
         {
-            // Check for light theme parameter
-            bool useLightTheme = args.Contains("--light", StringComparer.OrdinalIgnoreCase);
-
             try
             {
-                // Create console theme service first (before logging)
-                var consoleThemeService = new ConsoleThemeService(useLightTheme);
-
                 // Create configuration service
                 var configService = new ConfigurationService();
 
-                // Create logging service with the console theme
-                var loggingService = new LoggingService(configService.Configuration, consoleThemeService);
+                // Create logging service
+                var loggingService = new LoggingService(configService.Configuration);
 
                 // Log application start
                 loggingService.Information("prjBuild application starting");

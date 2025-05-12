@@ -12,7 +12,7 @@ namespace prjBuildApp.Services
     {
         private readonly ILogger _logger;
 
-        public LoggingService(IConfiguration configuration, ConsoleThemeService consoleThemeService)
+        public LoggingService(IConfiguration configuration)
         {
             try
             {
@@ -27,7 +27,6 @@ namespace prjBuildApp.Services
                     .MinimumLevel.Override("System", LogEventLevel.Warning)
                     // Configure console with restricted level (Information and above)
                     .WriteTo.Console(
-                        theme: consoleThemeService.GetSerilogTheme(),
                         restrictedToMinimumLevel: LogEventLevel.Information,
                         outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
                     // Configure file with all levels (Verbose and above)
@@ -42,10 +41,7 @@ namespace prjBuildApp.Services
                 // Set as static logger for global usage
                 Log.Logger = _logger;
 
-                Information("Logging initialized with {Theme} theme",
-                    consoleThemeService.CurrentTheme);
-                Information("Detected terminal environment: {Environment}",
-                    consoleThemeService.DetectedEnvironment);
+                Information("Logging initialized");
             }
             catch (Exception ex)
             {
@@ -71,12 +67,16 @@ namespace prjBuildApp.Services
 
         public void Warning(string messageTemplate, params object[] propertyValues)
         {
+            Console.ForegroundColor = ConsoleColor.Yellow;
             _logger.Warning(messageTemplate, propertyValues);
+            Console.ResetColor();
         }
 
         public void Error(Exception? exception, string messageTemplate, params object[] propertyValues)
         {
+            Console.ForegroundColor = ConsoleColor.Red;
             _logger.Error(exception, messageTemplate, propertyValues);
+            Console.ResetColor();
         }
 
         public void Debug(string messageTemplate, params object[] propertyValues)
