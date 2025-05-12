@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Text;
 
 using prjBuildApp.Models.Project;
 
@@ -101,6 +102,9 @@ namespace prjBuildApp.Services
                     File.Delete(destinationArchiveFile);
                 }
 
+                // List to store relative file paths for the file list
+                var relativeFilePaths = new List<string>();
+
                 // Create the archive with relative paths
                 using (var archive = ZipFile.Open(destinationArchiveFile, ZipArchiveMode.Create))
                 {
@@ -146,14 +150,22 @@ namespace prjBuildApp.Services
                             return; // Skip this directory and all its contents
                         }
 
+                        // Get all subdirectories and sort them in ordinal, case-ignored order
+                        var subdirectories = Directory.GetDirectories(directory)
+                            .Order(StringComparer.OrdinalIgnoreCase);
+
                         // Process all subdirectories first (recursive)
-                        foreach (var subDir in Directory.GetDirectories(directory))
+                        foreach (var subDir in subdirectories)
                         {
                             ScanDirectory(subDir);
                         }
 
+                        // Get all files and sort them in ordinal, case-ignored order
+                        var files = Directory.GetFiles(directory)
+                            .Order(StringComparer.OrdinalIgnoreCase);
+
                         // Then process all files in this directory (non-recursive)
-                        foreach (var file in Directory.GetFiles(directory))
+                        foreach (var file in files)
                         {
                             string relativeFilePath = Path.GetRelativePath(sourceDirectory, file);
 
@@ -173,11 +185,22 @@ namespace prjBuildApp.Services
                         string entryName = Path.GetRelativePath(sourceDirectory, file);
                         entryName = entryName.Replace('\\', '/'); // Use forward slashes for zip entries
                         archive.CreateEntryFromFile(file, entryName, CompressionLevel.Optimal);
+
+                        // Add to our list of relative paths for the file list
+                        relativeFilePaths.Add(entryName);
                     }
                 }
 
+                string fileListPath = Path.ChangeExtension(destinationArchiveFile, ".txt");
+
+                // Write the list to the file with UTF-8 encoding and BOM
+                // This ensures proper encoding detection for CJK characters
+                File.WriteAllLines(fileListPath, relativeFilePaths, new UTF8Encoding(true));
+
                 _loggingService.Information("Created archive {ArchiveFile} from {SourceDirectory} with relative paths",
                     destinationArchiveFile, sourceDirectory);
+                _loggingService.Information("Created file list {FileListPath} for archive {ArchiveFile}",
+                    fileListPath, destinationArchiveFile);
                 return true;
             }
             catch (Exception ex)
